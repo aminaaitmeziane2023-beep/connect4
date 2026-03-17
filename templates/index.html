@@ -431,6 +431,79 @@
     to   { box-shadow: inset 0 0 0 3px rgba(0,230,118,1); }
   }
 
+  
+  /* ── Paint mode ── */
+  .paint-toolbar {
+    display: none;
+    gap: 8px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    padding: 10px;
+    background: rgba(255,152,0,0.06);
+    border: 1px solid rgba(255,152,0,0.3);
+    border-radius: 8px;
+  }
+  .paint-toolbar.visible { display: flex; }
+  .paint-color-btn {
+    width: 34px; height: 34px; border-radius: 50%;
+    border: 3px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 1rem;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .paint-color-btn.selected { border-color: #fff; transform: scale(1.15); }
+  .paint-color-btn.red-paint  { background: #e53935; }
+  .paint-color-btn.yellow-paint { background: #fdd835; }
+  .paint-color-btn.erase-paint  { background: #333; color: #aaa; font-size: 0.7rem; }
+  .cell.paint-mode { cursor: crosshair; }
+  .cell.paint-mode:hover { opacity: 0.75; }
+  .paint-info { font-size: 0.62rem; color: #ff9800; font-family: var(--font-head); }
+  .paint-analyse {
+    background: #ff9800; color: #000; border: none;
+    padding: 7px 16px; border-radius: 6px; cursor: pointer;
+    font-family: var(--font-head); font-size: 0.62rem; font-weight: 700;
+    letter-spacing: 0.05em;
+  }
+  .paint-analyse:hover { background: #ffb300; }
+  .analyse-result {
+    display: none;
+    margin-top: 8px;
+    padding: 10px 14px;
+    background: rgba(0,230,118,0.08);
+    border: 1px solid rgba(0,230,118,0.3);
+    border-radius: 8px;
+    font-size: 0.65rem;
+    font-family: var(--font-head);
+    color: #ccc;
+    text-align: center;
+  }
+  .analyse-result.visible { display: block; }
+  .analyse-result .turn-label { font-size: 0.9rem; font-weight: 700; margin-bottom: 6px; }
+  .analyse-result .turn-rouge { color: #e53935; }
+  .analyse-result .turn-jaune { color: #fdd835; }
+
+  /* ── Switch player in-game ── */
+  .switch-panel {
+    display: none;
+    gap: 8px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .switch-panel.visible { display: flex; }
+  .switch-btn {
+    background: #1a1a2e; border: 1px solid #2a2a4a;
+    color: #aaa; padding: 6px 12px; border-radius: 6px;
+    cursor: pointer; font-family: var(--font-head); font-size: 0.58rem;
+    transition: all 0.2s;
+  }
+  .switch-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .switch-btn.human-active { border-color: #00e676; color: #00e676; }
+  .switch-btn.ai-active    { border-color: #3a7bff; color: #3a7bff; }
+
   </style>
 </head>
 <body>
@@ -512,8 +585,29 @@
       <button class="ctrl-btn" id="btnPause"   onclick="togglePause()" disabled>⏸ PAUSE</button>
       <button class="ctrl-btn danger" id="btnRestart" onclick="restartGame()" disabled title="Rejouer même config">↺ RESTART</button>
       <button class="ctrl-btn" id="btnHint" onclick="getHint()" disabled title="Meilleur coup suggéré">💡 HINT</button>
+      <button class="ctrl-btn" id="btnPaint" onclick="togglePaint()" title="Peindre une position de départ">🎨 PAINT</button>
     </div>
   </div>
+
+    <!-- Paint toolbar -->
+    <div class="paint-toolbar" id="paintToolbar">
+      <span class="paint-info">🎨 MODE PEINTURE</span>
+      <button class="paint-color-btn red-paint selected" id="paintRed"    onclick="setPaintColor('R')" title="Rouge"></button>
+      <button class="paint-color-btn yellow-paint"       id="paintYellow" onclick="setPaintColor('J')" title="Jaune"></button>
+      <button class="paint-color-btn erase-paint"        id="paintErase"  onclick="setPaintColor('.')" title="Effacer">✕</button>
+      <button class="paint-analyse" onclick="analyseBoard()">🔍 ANALYSER</button>
+      <button class="ctrl-btn danger" onclick="clearPaint()" style="padding:6px 12px;font-size:0.6rem;">🗑 RESET</button>
+    </div>
+
+    <!-- Résultat analyse -->
+    <div class="analyse-result" id="analyseResult"></div>
+
+    <!-- Switch joueur en pleine partie -->
+    <div class="switch-panel" id="switchPanel">
+      <span style="font-size:0.58rem;color:#666;font-family:var(--font-head);">CONTRÔLE :</span>
+      <button class="switch-btn" id="switchRed"    onclick="switchPlayer('red')">🔴 Rouge : <span id="switchRedLabel">—</span></button>
+      <button class="switch-btn" id="switchYellow" onclick="switchPlayer('yellow')">🟡 Jaune : <span id="switchYellowLabel">—</span></button>
+    </div>
 
   <!-- ===== PLATEAU ===== -->
   <div class="board-wrapper">
@@ -684,6 +778,9 @@ async function startGame() {
     renderBoard();
     updateStatus();
     updateControlBtns();
+    updateSwitchPanel();
+    aiRedType = 'minmax';
+    aiYellowType = currentMode === '1player' ? (humanColor === RED ? 'human' : 'minmax') : 'minmax';
     // Si IA joue en premier
     if (shouldAiPlayNext()) {
       setTimeout(triggerAiMove, 500);
@@ -714,6 +811,7 @@ async function humanPlay(col) {
     renderBoard();
     updateStatus();
     updateControlBtns();
+    updateSwitchPanel();
     if (!state.game_over && shouldAiPlayNext()) {
       setTimeout(triggerAiMove, 400);
     }
@@ -724,6 +822,246 @@ async function humanPlay(col) {
 //  COUP IA
 
 
+
+
+// ================================================================
+//  MODE PEINTURE
+// ================================================================
+let paintMode    = false;
+let paintColor   = 'R';   // 'R', 'J', '.'
+let paintBoard   = Array(9).fill(null).map(() => Array(9).fill('.'));
+let aiRedType    = 'minmax';
+let aiYellowType = 'human';
+
+function togglePaint() {
+  paintMode = !paintMode;
+  const btn     = document.getElementById('btnPaint');
+  const toolbar = document.getElementById('paintToolbar');
+  const result  = document.getElementById('analyseResult');
+
+  if (paintMode) {
+    // Arrêter la partie en cours
+    gameActive = false;
+    isPaused   = false;
+    btn.textContent = '✕ QUITTER PAINT';
+    btn.classList.add('pause-active');
+    toolbar.classList.add('visible');
+    result.classList.remove('visible');
+    // Initialiser paintBoard depuis état courant ou vide
+    if (state && state.board) {
+      for (let r = 0; r < ROWS; r++)
+        for (let c = 0; c < COLS; c++)
+          paintBoard[r][c] = state.board[r][c] === 1 ? 'R' : state.board[r][c] === 2 ? 'J' : '.';
+    } else {
+      paintBoard = Array(ROWS).fill(null).map(() => Array(COLS).fill('.'));
+    }
+    renderPaintBoard();
+    updateControlBtns();
+  } else {
+    btn.textContent = '🎨 PAINT';
+    btn.classList.remove('pause-active');
+    toolbar.classList.remove('visible');
+    result.classList.remove('visible');
+    if (state) renderBoard();
+    updateControlBtns();
+  }
+}
+
+function setPaintColor(c) {
+  paintColor = c;
+  document.getElementById('paintRed').classList.toggle('selected', c === 'R');
+  document.getElementById('paintYellow').classList.toggle('selected', c === 'J');
+  document.getElementById('paintErase').classList.toggle('selected', c === '.');
+}
+
+function renderPaintBoard() {
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const cell = document.getElementById(`cell-${r}-${c}`);
+      if (!cell) continue;
+      cell.className = 'cell paint-mode';
+      const val = paintBoard[r][c];
+      if      (val === 'R') { cell.classList.add('red');    }
+      else if (val === 'J') { cell.classList.add('yellow'); }
+    }
+  }
+  // Rebind clicks pour paint
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const cell = document.getElementById(`cell-${r}-${c}`);
+      if (cell) {
+        cell.onclick = null;
+        cell.onclick = ((row, col) => () => paintCell(row, col))(r, c);
+      }
+    }
+  }
+}
+
+function paintCell(row, col) {
+  if (!paintMode) return;
+  paintBoard[row][col] = paintColor;
+  renderPaintBoard();
+  // Mise à jour compteurs dans l'analyse
+  const flat = paintBoard.flat();
+  const r = flat.filter(x => x === 'R').length;
+  const j = flat.filter(x => x === 'J').length;
+  const diff = r - j;
+  const result = document.getElementById('analyseResult');
+  if (diff < -1 || diff > 1) {
+    result.innerHTML = `<div class="turn-label" style="color:#f44;">⚠ Position invalide : ${r} rouges, ${j} jaunes</div>`;
+    result.classList.add('visible');
+  } else {
+    result.classList.remove('visible');
+  }
+}
+
+function clearPaint() {
+  paintBoard = Array(ROWS).fill(null).map(() => Array(COLS).fill('.'));
+  renderPaintBoard();
+  document.getElementById('analyseResult').classList.remove('visible');
+}
+
+async function analyseBoard() {
+  const flat = paintBoard.flat().join('');
+  const r = flat.split('R').length - 1;
+  const j = flat.split('J').length - 1;
+  const diff = r - j;
+
+  const result = document.getElementById('analyseResult');
+
+  if (diff < -1 || diff > 1) {
+    result.innerHTML = `<div class="turn-label" style="color:#f44;">⚠ Position invalide</div>
+      <div>${r} rouges, ${j} jaunes — différence maximale autorisée : 1</div>`;
+    result.classList.add('visible');
+    return;
+  }
+
+  const turnPlayer  = (r === j) ? 'Rouge' : 'Jaune';
+  const turnClass   = (r === j) ? 'turn-rouge' : 'turn-jaune';
+  const turnEmoji   = (r === j) ? '🔴' : '🟡';
+
+  // Afficher l'analyse
+  result.innerHTML = `
+    <div class="turn-label ${turnClass}">${turnEmoji} C'est à ${turnPlayer} de jouer</div>
+    <div style="margin-bottom:8px;color:#888;">${r} pièces rouges · ${j} pièces jaunes</div>
+    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+      <button class="paint-analyse" onclick="launchFromPaint('1player', ${(r===j)?1:2})">▶ Jouer comme ${turnPlayer} (1 joueur)</button>
+      <button class="paint-analyse" style="background:#3a7bff;" onclick="launchFromPaint('2player', 1)">▶ 2 Joueurs</button>
+      <button class="paint-analyse" style="background:#9c27b0;" onclick="launchFromPaint('0player', 1)">▶ IA vs IA</button>
+    </div>`;
+  result.classList.add('visible');
+}
+
+async function launchFromPaint(mode, humanColorVal) {
+  const flat = paintBoard.flat().join('');
+  const ai2Val = document.getElementById('ai2Select') ? document.getElementById('ai2Select').value : 'minmax';
+  const depthVal = document.getElementById('depthRange') ? parseInt(document.getElementById('depthRange').value) : 4;
+
+  const res = await fetch('/api/set_board', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      grid_str: flat,
+      mode: mode,
+      ai1: 'minmax',
+      ai2: ai2Val,
+      depth: depthVal,
+      human_color: humanColorVal
+    })
+  });
+  const data = await res.json();
+  if (data.ok) {
+    state = data.state;
+    humanColor = humanColorVal;
+    currentMode = mode;
+    gameActive = true;
+    paintMode = false;
+
+    // Quitter le mode paint
+    document.getElementById('btnPaint').textContent = '🎨 PAINT';
+    document.getElementById('btnPaint').classList.remove('pause-active');
+    document.getElementById('paintToolbar').classList.remove('visible');
+    document.getElementById('analyseResult').classList.remove('visible');
+
+    // Rebind clicks normaux
+    for (let c = 0; c < COLS; c++) {
+      const btn = document.getElementById(`colbtn-${c}`);
+      if (btn) btn.onclick = () => humanPlay(c);
+    }
+    for (let r2 = 0; r2 < ROWS; r2++)
+      for (let c = 0; c < COLS; c++) {
+        const cell = document.getElementById(`cell-${r2}-${c}`);
+        if (cell) cell.onclick = null;
+      }
+
+    renderBoard();
+    updateStatus();
+    updateControlBtns();
+    updateSwitchPanel();
+
+    if (shouldAiPlayNext()) setTimeout(triggerAiMove, 500);
+  } else {
+    alert(data.error || 'Erreur lors du chargement de la position');
+  }
+}
+
+// ================================================================
+//  SWITCH JOUEUR EN PLEINE PARTIE
+// ================================================================
+function updateSwitchPanel() {
+  const panel = document.getElementById('switchPanel');
+  if (!gameActive || !state) { panel.classList.remove('visible'); return; }
+  panel.classList.add('visible');
+
+  // Labels
+  const redLabel    = document.getElementById('switchRedLabel');
+  const yellowLabel = document.getElementById('switchYellowLabel');
+  const redBtn      = document.getElementById('switchRed');
+  const yellowBtn   = document.getElementById('switchYellow');
+
+  if (currentMode === '2player') {
+    redLabel.textContent    = 'Humain';
+    yellowLabel.textContent = 'Humain';
+    redBtn.className    = 'switch-btn human-active';
+    yellowBtn.className = 'switch-btn human-active';
+    return;
+  }
+
+  // Récupérer types actuels
+  redLabel.textContent    = aiRedType === 'human' ? 'Humain' : aiRedType.toUpperCase();
+  yellowLabel.textContent = aiYellowType === 'human' ? 'Humain' : aiYellowType.toUpperCase();
+  redBtn.className    = 'switch-btn ' + (aiRedType    === 'human' ? 'human-active' : 'ai-active');
+  yellowBtn.className = 'switch-btn ' + (aiYellowType === 'human' ? 'human-active' : 'ai-active');
+}
+
+async function switchPlayer(color) {
+  const isRed   = color === 'red';
+  const current = isRed ? aiRedType : aiYellowType;
+  const newType = current === 'human' ? 'minmax' : 'human';
+  const which   = isRed ? 'ai1' : 'ai2';
+
+  const res = await fetch('/api/switch_player', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ which, type: newType })
+  });
+  const data = await res.json();
+  if (data.ok) {
+    if (isRed) aiRedType = newType;
+    else       aiYellowType = newType;
+
+    // Mettre à jour humanColor si mode 1player
+    if (currentMode === '1player') {
+      if (newType === 'human') humanColor = isRed ? RED : YELLOW;
+    }
+
+    updateSwitchPanel();
+    // Si c'est maintenant le tour de l'IA → jouer
+    if (shouldAiPlayNext() && !isPaused && !isAiTurn) {
+      setTimeout(triggerAiMove, 400);
+    }
+  }
+}
 
 // ================================================================
 //  HINT
@@ -791,7 +1129,8 @@ function updateControlBtns() {
   document.getElementById('btnUndo').disabled    = !hasHistory || isPaused;
   document.getElementById('btnPause').disabled   = !notOver;
   document.getElementById('btnRestart').disabled = !hasGame;
-  document.getElementById('btnHint').disabled = !notOver || currentMode !== '1player' || isAiTurn;
+  document.getElementById('btnHint').disabled = !notOver || currentMode !== '1player' || isAiTurn || paintMode;
+  document.getElementById('btnPaint').classList.toggle('pause-active', paintMode);
 }
 
 async function undoMove() {

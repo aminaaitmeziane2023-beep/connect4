@@ -124,6 +124,76 @@ def play():
 
 
 
+
+@app.route("/api/set_board", methods=["POST"])
+def set_board():
+    """Charge une position personnalisée peinte par l'utilisateur."""
+    data = request.get_json(force=True)
+    grid_str = data.get("grid_str", "")
+    mode     = data.get("mode", "1player")
+    ai1      = data.get("ai1", "minmax")
+    ai2      = data.get("ai2", "minmax")
+    depth    = int(data.get("depth", 4))
+    human_color = int(data.get("human_color", RED))
+
+    # Validation longueur
+    if len(grid_str) != 81:
+        return jsonify({"error": "Grille invalide (81 cases requises)"}), 400
+
+    # Valider caractères
+    for ch in grid_str:
+        if ch not in ("R", "J", "."):
+            return jsonify({"error": f"Caractère invalide : {ch}"}), 400
+
+    game = Connect4.from_str(grid_str)
+
+    # Auto-détecter à qui de jouer
+    r_count = grid_str.count("R")
+    j_count = grid_str.count("J")
+    if r_count == j_count:
+        game.current_player = RED    # Rouge commence
+    elif r_count == j_count + 1:
+        game.current_player = YELLOW  # Jaune joue
+    else:
+        return jsonify({"error": f"Position invalide : {r_count} rouges vs {j_count} jaunes (différence > 1)"}), 400
+
+    # Créer la partie en DB
+    try:
+        gid = database.create_game(mode, ai1, ai2, depth)
+        database.save_state(gid, game.ply, game.board_to_str())
+    except Exception as e:
+        logger.warning(f"DB save échoué: {e}")
+        gid = None
+
+    session["board"]       = game.board_to_str()
+    session["mode"]        = mode
+    session["ai1"]         = ai1
+    session["ai2"]         = ai2
+    session["depth"]       = depth
+    session["human_color"] = human_color
+    session["game_id"]     = gid
+    session["history"]     = []
+
+    turn_label = "Rouge" if game.current_player == RED else "Jaune"
+    return jsonify({
+        "ok": True,
+        "state": game.to_dict(),
+        "turn": turn_label,
+        "r_count": r_count,
+        "j_count": j_count
+    })
+
+
+@app.route("/api/switch_player", methods=["POST"])
+def switch_player():
+    """Bascule Rouge ou Jaune entre Humain et IA en pleine partie."""
+    data   = request.get_json(force=True)
+    which  = data.get("which", "ai2")   # "ai1" (rouge) ou "ai2" (jaune)
+    new_type = data.get("type", "minmax")  # "human", "minmax", "ia", "random"
+
+    session[which] = new_type
+    return jsonify({"ok": True, "which": which, "type": new_type})
+
 @app.route("/api/hint", methods=["POST"])
 def hint():
     """Suggère la meilleure colonne pour le joueur humain."""
