@@ -364,7 +364,18 @@
     .main-layout { flex-direction: column; align-items: center; }
     .controls, .status-panel { width: 100%; max-width: 500px; }
   }
-</style>
+
+  #btnHistorique {
+    background: transparent;
+    border: 1.5px solid #3a7bff;
+    color: #3a7bff;
+    margin-top: 8px;
+  }
+  #btnHistorique:hover {
+    background: rgba(58,123,255,0.12);
+  }
+
+  </style>
 </head>
 <body>
 
@@ -438,6 +449,7 @@
     </div>
 
     <button class="btn-start" onclick="startGame()">▶ NOUVELLE PARTIE</button>
+    <button class="btn-start" id="btnHistorique" onclick="showHistorique()">📋 HISTORIQUE</button>
   </div>
 
   <!-- ===== PLATEAU ===== -->
@@ -815,6 +827,73 @@ async function loadStats() {
 buildBoard();
 onModeChange();
 loadStats();
+</script>
+
+<!-- ===== MODAL HISTORIQUE ===== -->
+<div id="modalHistorique" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:1000;overflow-y:auto;padding:20px;box-sizing:border-box;">
+  <div style="max-width:860px;margin:0 auto;background:#1a1a2e;border:1px solid #2a2a4a;border-radius:12px;padding:28px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <h2 style="color:#3a7bff;font-family:Orbitron,sans-serif;margin:0;font-size:1.1rem;">📋 HISTORIQUE DES PARTIES</h2>
+      <button onclick="closeHistorique()" style="background:none;border:1px solid #2a2a4a;color:#ccc;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:1rem;">✕ Fermer</button>
+    </div>
+    <div id="historiqueContent"></div>
+  </div>
+</div>
+
+<script>
+// ================================================================
+//  HISTORIQUE
+// ================================================================
+async function showHistorique() {
+  document.getElementById('modalHistorique').style.display = 'block';
+  document.getElementById('historiqueContent').innerHTML = '<p style="text-align:center;color:#888;font-family:Orbitron,sans-serif;">Chargement...</p>';
+  try {
+    const res = await fetch('/api/historique');
+    const data = await res.json();
+    const parties = data.parties;
+    if (!parties || parties.length === 0) {
+      document.getElementById('historiqueContent').innerHTML = '<p style="text-align:center;color:#888;font-family:Orbitron,sans-serif;">Aucune partie enregistrée pour l'instant.</p>';
+      return;
+    }
+    let html = `<table style="width:100%;border-collapse:collapse;font-family:Orbitron,sans-serif;font-size:0.7rem;">
+      <thead>
+        <tr style="border-bottom:1px solid #2a2a4a;color:#3a7bff;">
+          <th style="padding:8px 6px;text-align:left;">#</th>
+          <th style="padding:8px 6px;text-align:left;">DATE</th>
+          <th style="padding:8px 6px;text-align:left;">MODE</th>
+          <th style="padding:8px 6px;text-align:left;">IA ROUGE</th>
+          <th style="padding:8px 6px;text-align:left;">IA JAUNE</th>
+          <th style="padding:8px 6px;text-align:left;">RÉSULTAT</th>
+        </tr>
+      </thead>
+      <tbody>`;
+    parties.forEach((p, i) => {
+      const bg = i % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent';
+      html += `<tr style="background:${bg};border-bottom:1px solid #1a1a2e;">
+        <td style="padding:7px 6px;color:#666;">${p.id}</td>
+        <td style="padding:7px 6px;color:#aaa;">${p.date}</td>
+        <td style="padding:7px 6px;color:#ccc;">${p.mode}</td>
+        <td style="padding:7px 6px;color:#ccc;">${p.ai1}</td>
+        <td style="padding:7px 6px;color:#ccc;">${p.ai2}</td>
+        <td style="padding:7px 6px;font-weight:bold;">${p.resultat}</td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+    html += `<p style="text-align:right;color:#666;font-family:Orbitron,sans-serif;font-size:0.65rem;margin-top:12px;">${parties.length} partie(s) affichée(s)</p>`;
+    document.getElementById('historiqueContent').innerHTML = html;
+  } catch(e) {
+    document.getElementById('historiqueContent').innerHTML = '<p style="text-align:center;color:#f44;">Erreur lors du chargement.</p>';
+  }
+}
+
+function closeHistorique() {
+  document.getElementById('modalHistorique').style.display = 'none';
+}
+
+// Fermer en cliquant en dehors
+document.getElementById('modalHistorique').addEventListener('click', function(e) {
+  if (e.target === this) closeHistorique();
+});
 </script>
 </body>
 </html>
