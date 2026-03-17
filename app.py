@@ -171,45 +171,78 @@ def page_historique():
 
 @app.route("/api/historique", methods=["GET"])
 def historique():
-    """Retourne l'historique des parties jouées via l'application."""
+    """Retourne l'historique de toutes les parties (app_games + games historiques)."""
+    source = request.args.get("source", "all")  # all, app, historique
+    page   = int(request.args.get("page", 1))
+    limit  = 50
+    offset = (page - 1) * limit
+
     try:
         conn = database.get_connection()
-        cur = conn.cursor()
-        cur.execute("""
-            SELECT id, mode, ai1_type, ai2_type, depth, winner, created_at
-            FROM app_games
-            ORDER BY created_at DESC
-            LIMIT 100
-        """)
-        rows = cur.fetchall()
-        cur.close()
+        cur  = conn.cursor()
         parties = []
-        for r in rows:
-            gid, mode, ai1, ai2, depth, winner, created_at = r
-            if winner is None:
-                resultat = "⏳ En cours"
-            elif winner == 1:
-                resultat = "🔴 Rouge gagne"
-            elif winner == 2:
-                resultat = "🟡 Jaune gagne"
-            elif winner == 0:
-                resultat = "⚪ Match nul"
-            else:
-                resultat = "En cours"
-            parties.append({
-                "id": gid,
-                "mode": mode,
-                "ai1": ai1 or "-",
-                "ai2": ai2 or "-",
-                "depth": depth,
-                "winner": winner,
-                "resultat": resultat,
-                "date": created_at.strftime("%d/%m/%Y %H:%M") if created_at else "-"
-            })
-        return jsonify({"parties": parties})
+
+        # ---- Parties jouées via l'appli ----
+        if source in ("all", "app"):
+            cur.execute("""
+                SELECT id, mode, ai1_type, ai2_type, winner, created_at, 'app' as src
+                FROM app_games
+                ORDER BY created_at DESC
+            """)
+            for gid, mode, ai1, ai2, winner, created_at, src in cur.fetchall():
+                parties.append(_format_party(gid, mode, ai1, ai2, winner, created_at, src))
+
+        # ---- Parties historiques importées ----
+        if source in ("all", "historique"):
+            cur.execute("""
+                SELECT id,
+                       CASE mode WHEN 0 THEN 'IA vs IA' WHEN 1 THEN '1 joueur' WHEN 2 THEN '2 joueurs' ELSE 'inconnu' END,
+                       premier,
+                       joueur_actuel,
+                       CASE WHEN is_draw = 1 THEN 0
+                            WHEN winner = 'R' THEN 1
+                            WHEN winner = 'J' THEN 2
+                            ELSE NULL END,
+                       created_at,
+                       'historique' as src
+                FROM games
+                ORDER BY created_at DESC
+            """)
+            for gid, mode, ai1, ai2, winner, created_at, src in cur.fetchall():
+                parties.append(_format_party(gid, mode, ai1 or "-", ai2 or "-", winner, created_at, src))
+
+        cur.close()
+
+        total = len(parties)
+        parties_page = parties[offset:offset+limit]
+        return jsonify({"parties": parties_page, "total": total, "page": page, "limit": limit})
+
     except Exception as e:
         logger.error(f"Erreur historique: {e}")
-        return jsonify({"parties": [], "error": str(e)})
+        return jsonify({"parties": [], "total": 0, "error": str(e)})
+
+
+def _format_party(gid, mode, ai1, ai2, winner, created_at, source):
+    if winner is None:
+        resultat = "⏳ En cours"
+    elif winner == 1:
+        resultat = "🔴 Rouge gagne"
+    elif winner == 2:
+        resultat = "🟡 Jaune gagne"
+    elif winner == 0:
+        resultat = "⚪ Match nul"
+    else:
+        resultat = "❓"
+    return {
+        "id":      gid,
+        "mode":    mode or "-",
+        "ai1":     ai1 or "-",
+        "ai2":     ai2 or "-",
+        "winner":  winner,
+        "resultat": resultat,
+        "source":  source,
+        "date":    created_at.strftime("%d/%m/%Y %H:%M") if created_at else "-"
+    }
 
 
 # ------------------------------------------------------------------ #

@@ -4,81 +4,50 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Historique — Puissance 4</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      background: #0d0d1a;
-      color: #ccc;
-      font-family: 'Orbitron', sans-serif;
-      min-height: 100vh;
-      padding: 30px 20px;
-    }
-    .container { max-width: 900px; margin: 0 auto; }
-    h1 {
-      color: #3a7bff;
-      font-size: 1.4rem;
-      margin-bottom: 24px;
-      border-bottom: 1px solid #2a2a4a;
-      padding-bottom: 14px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    a.back {
-      font-size: 0.75rem;
-      color: #3a7bff;
-      text-decoration: none;
-      border: 1px solid #3a7bff;
-      padding: 6px 14px;
-      border-radius: 6px;
-    }
+    body { background: #0d0d1a; color: #ccc; font-family: 'Orbitron', sans-serif; min-height: 100vh; padding: 30px 20px; }
+    .container { max-width: 960px; margin: 0 auto; }
+
+    h1 { color: #3a7bff; font-size: 1.3rem; margin-bottom: 22px; border-bottom: 1px solid #2a2a4a; padding-bottom: 14px; display: flex; justify-content: space-between; align-items: center; }
+    a.back { font-size: 0.7rem; color: #3a7bff; text-decoration: none; border: 1px solid #3a7bff; padding: 6px 14px; border-radius: 6px; }
     a.back:hover { background: rgba(58,123,255,0.12); }
 
-    .stats-bar {
-      display: flex;
-      gap: 16px;
-      margin-bottom: 24px;
-      flex-wrap: wrap;
-    }
-    .stat-card {
-      background: #1a1a2e;
-      border: 1px solid #2a2a4a;
-      border-radius: 8px;
-      padding: 12px 20px;
-      text-align: center;
-      flex: 1;
-      min-width: 140px;
-    }
-    .stat-card .val { font-size: 1.6rem; color: #3a7bff; font-weight: 700; }
-    .stat-card .lbl { font-size: 0.6rem; color: #888; margin-top: 4px; }
+    .stats-bar { display: flex; gap: 12px; margin-bottom: 22px; flex-wrap: wrap; }
+    .stat-card { background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 8px; padding: 12px 18px; text-align: center; flex: 1; min-width: 120px; }
+    .stat-card .val { font-size: 1.5rem; color: #3a7bff; font-weight: 700; }
+    .stat-card .lbl { font-size: 0.58rem; color: #888; margin-top: 4px; }
 
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.68rem;
-    }
-    thead tr {
-      border-bottom: 2px solid #3a7bff;
-      color: #3a7bff;
-    }
+    .filters { display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; align-items: center; }
+    .filter-btn { background: #1a1a2e; border: 1px solid #2a2a4a; color: #aaa; padding: 7px 16px; border-radius: 6px; cursor: pointer; font-family: 'Orbitron', sans-serif; font-size: 0.65rem; }
+    .filter-btn.active { border-color: #3a7bff; color: #3a7bff; background: rgba(58,123,255,0.1); }
+    .filter-btn:hover { border-color: #3a7bff; color: #3a7bff; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.65rem; }
+    thead tr { border-bottom: 2px solid #3a7bff; color: #3a7bff; }
     th { padding: 10px 8px; text-align: left; }
-    td { padding: 9px 8px; border-bottom: 1px solid #1a1a2e; }
-    tr:hover td { background: rgba(58,123,255,0.05); }
-    .badge {
-      padding: 3px 8px;
-      border-radius: 4px;
-      font-size: 0.65rem;
-      font-weight: 700;
-    }
+    td { padding: 8px 8px; border-bottom: 1px solid #151525; }
+    tr:hover td { background: rgba(58,123,255,0.04); }
+
+    .badge { padding: 3px 8px; border-radius: 4px; font-size: 0.62rem; font-weight: 700; }
     .badge-rouge { background: rgba(255,80,80,0.15); color: #ff5050; }
     .badge-jaune { background: rgba(255,200,0,0.15); color: #ffc800; }
     .badge-nul   { background: rgba(150,150,150,0.15); color: #aaa; }
     .badge-cours { background: rgba(58,123,255,0.15); color: #3a7bff; }
 
-    .empty { text-align: center; color: #555; padding: 60px 0; font-size: 0.85rem; }
-    .footer { text-align: right; color: #444; font-size: 0.6rem; margin-top: 14px; }
+    .src-tag { font-size: 0.55rem; padding: 2px 6px; border-radius: 3px; }
+    .src-app  { background: rgba(58,123,255,0.15); color: #3a7bff; }
+    .src-hist { background: rgba(120,80,255,0.15); color: #a07bff; }
+
+    .pagination { display: flex; gap: 8px; margin-top: 18px; justify-content: center; align-items: center; }
+    .page-btn { background: #1a1a2e; border: 1px solid #2a2a4a; color: #aaa; padding: 7px 14px; border-radius: 6px; cursor: pointer; font-family: 'Orbitron', sans-serif; font-size: 0.62rem; }
+    .page-btn:hover, .page-btn.active { border-color: #3a7bff; color: #3a7bff; }
+    .page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    .page-info { font-size: 0.62rem; color: #666; }
+
+    .empty { text-align: center; color: #555; padding: 60px 0; font-size: 0.8rem; }
+    .loading { text-align: center; color: #3a7bff; padding: 40px 0; font-size: 0.75rem; }
   </style>
 </head>
 <body>
@@ -88,67 +57,109 @@
     <a class="back" href="/">← RETOUR AU JEU</a>
   </h1>
 
-  <div class="stats-bar" id="statsBar">
-    <div class="stat-card"><div class="val" id="sTotal">—</div><div class="lbl">PARTIES TOTALES</div></div>
-    <div class="stat-card"><div class="val" id="sRouge">—</div><div class="lbl">VICTOIRES ROUGE</div></div>
-    <div class="stat-card"><div class="val" id="sJaune">—</div><div class="lbl">VICTOIRES JAUNE</div></div>
-    <div class="stat-card"><div class="val" id="sNul">—</div><div class="lbl">MATCHS NULS</div></div>
+  <div class="stats-bar">
+    <div class="stat-card"><div class="val" id="sTotal">—</div><div class="lbl">TOTAL PARTIES</div></div>
+    <div class="stat-card"><div class="val" id="sRouge">—</div><div class="lbl">🔴 ROUGE GAGNE</div></div>
+    <div class="stat-card"><div class="val" id="sJaune">—</div><div class="lbl">🟡 JAUNE GAGNE</div></div>
+    <div class="stat-card"><div class="val" id="sNul">—</div><div class="lbl">⚪ MATCHS NULS</div></div>
   </div>
 
-  <div id="tableContainer">
-    <p class="empty">Chargement...</p>
+  <div class="filters">
+    <span style="font-size:0.62rem;color:#666;">AFFICHER :</span>
+    <button class="filter-btn active" id="f-all"        onclick="setFilter('all')">🗂 Tout</button>
+    <button class="filter-btn"        id="f-app"        onclick="setFilter('app')">🎮 Mes parties</button>
+    <button class="filter-btn"        id="f-historique" onclick="setFilter('historique')">🗄 Base de données</button>
   </div>
+
+  <div id="tableContainer"><p class="loading">Chargement...</p></div>
+
+  <div class="pagination" id="pagination"></div>
 </div>
 
 <script>
+let currentFilter = 'all';
+let currentPage   = 1;
+let totalParties  = 0;
+const LIMIT = 50;
+
 async function load() {
+  document.getElementById('tableContainer').innerHTML = '<p class="loading">Chargement...</p>';
   try {
-    const res = await fetch('/api/historique');
+    const res  = await fetch(`/api/historique?source=${currentFilter}&page=${currentPage}`);
     const data = await res.json();
     const parties = data.parties || [];
+    totalParties  = data.total  || 0;
 
-    // Stats
-    const rouge = parties.filter(p => p.winner === 1).length;
-    const jaune = parties.filter(p => p.winner === 2).length;
-    const nul   = parties.filter(p => p.winner === 0).length;
-    document.getElementById('sTotal').textContent = parties.length;
-    document.getElementById('sRouge').textContent = rouge;
-    document.getElementById('sJaune').textContent = jaune;
-    document.getElementById('sNul').textContent   = nul;
+    // Stats (basées sur la page courante — on recalcule sur tout si page 1)
+    if (currentPage === 1) {
+      const rouge = parties.filter(p => p.winner === 1).length;
+      const jaune = parties.filter(p => p.winner === 2).length;
+      const nul   = parties.filter(p => p.winner === 0).length;
+      document.getElementById('sTotal').textContent = totalParties.toLocaleString();
+      document.getElementById('sRouge').textContent = rouge;
+      document.getElementById('sJaune').textContent = jaune;
+      document.getElementById('sNul').textContent   = nul;
+    }
 
     if (parties.length === 0) {
-      document.getElementById('tableContainer').innerHTML = '<p class="empty">Aucune partie enregistrée pour l\'instant.<br>Jouez une partie pour la voir apparaître ici !</p>';
+      document.getElementById('tableContainer').innerHTML = '<p class="empty">Aucune partie trouvée.</p>';
+      renderPagination();
       return;
     }
 
     let html = `<table>
       <thead><tr>
-        <th>#</th><th>DATE</th><th>MODE</th><th>IA ROUGE</th><th>IA JAUNE</th><th>RÉSULTAT</th>
+        <th>#</th><th>DATE</th><th>MODE</th><th>PREMIER JOUEUR</th><th>IA / J2</th><th>RÉSULTAT</th><th>SOURCE</th>
       </tr></thead><tbody>`;
 
     for (const p of parties) {
       let badge = '';
-      if (p.winner === 1)      badge = '<span class="badge badge-rouge">🔴 Rouge gagne</span>';
-      else if (p.winner === 2) badge = '<span class="badge badge-jaune">🟡 Jaune gagne</span>';
-      else if (p.winner === 0) badge = '<span class="badge badge-nul">⚪ Match nul</span>';
+      if      (p.winner === 1) badge = '<span class="badge badge-rouge">🔴 Rouge</span>';
+      else if (p.winner === 2) badge = '<span class="badge badge-jaune">🟡 Jaune</span>';
+      else if (p.winner === 0) badge = '<span class="badge badge-nul">⚪ Nul</span>';
       else                     badge = '<span class="badge badge-cours">⏳ En cours</span>';
+
+      const srcTag = p.source === 'app'
+        ? '<span class="src-tag src-app">🎮 appli</span>'
+        : '<span class="src-tag src-hist">🗄 BD</span>';
 
       html += `<tr>
         <td style="color:#555">${p.id}</td>
-        <td style="color:#aaa">${p.date}</td>
-        <td>${p.mode}</td>
+        <td style="color:#888">${p.date}</td>
+        <td style="color:#ccc">${p.mode}</td>
         <td style="color:#ccc">${p.ai1}</td>
         <td style="color:#ccc">${p.ai2}</td>
         <td>${badge}</td>
+        <td>${srcTag}</td>
       </tr>`;
     }
     html += '</tbody></table>';
-    html += `<p class="footer">${parties.length} partie(s) affichée(s)</p>`;
     document.getElementById('tableContainer').innerHTML = html;
+    renderPagination();
 
   } catch(e) {
-    document.getElementById('tableContainer').innerHTML = '<p class="empty" style="color:#f44">Erreur de chargement : ' + e.message + '</p>';
+    document.getElementById('tableContainer').innerHTML = `<p class="empty" style="color:#f44">Erreur : ${e.message}</p>`;
   }
+}
+
+function renderPagination() {
+  const totalPages = Math.ceil(totalParties / LIMIT);
+  if (totalPages <= 1) { document.getElementById('pagination').innerHTML = ''; return; }
+
+  let html = `<button class="page-btn" onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>◀ Préc.</button>`;
+  html += `<span class="page-info">Page ${currentPage} / ${totalPages} (${totalParties} parties)</span>`;
+  html += `<button class="page-btn" onclick="goPage(${currentPage+1})" ${currentPage>=totalPages?'disabled':''}>Suiv. ▶</button>`;
+  document.getElementById('pagination').innerHTML = html;
+}
+
+function goPage(p) { currentPage = p; load(); window.scrollTo(0,0); }
+
+function setFilter(f) {
+  currentFilter = f;
+  currentPage   = 1;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('f-' + f).classList.add('active');
+  load();
 }
 
 load();
