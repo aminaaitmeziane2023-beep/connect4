@@ -712,6 +712,54 @@ async function humanPlay(col) {
 // ================================================================
 //  COUP IA
 
+
+// ================================================================
+//  CONTRÔLES : UNDO / PAUSE / RESTART
+// ================================================================
+function updateControlBtns() {
+  const hasGame    = gameActive;
+  const notOver    = hasGame && state && !state.game_over;
+  const hasHistory = hasGame && state && state.ply > 0;
+  document.getElementById('btnUndo').disabled    = !hasHistory || isPaused;
+  document.getElementById('btnPause').disabled   = !notOver;
+  document.getElementById('btnRestart').disabled = !hasGame;
+}
+
+async function undoMove() {
+  if (!gameActive || isPaused) return;
+  const res = await fetch('/api/undo', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
+  const data = await res.json();
+  if (data.ok) {
+    state = data.state;
+    clearWeights();
+    renderBoard();
+    updateStatus();
+    updateControlBtns();
+  }
+}
+
+function togglePause() {
+  if (!gameActive) return;
+  isPaused = !isPaused;
+  const btn = document.getElementById('btnPause');
+  if (isPaused) {
+    btn.textContent = '▶ RESUME';
+    btn.classList.add('pause-active');
+  } else {
+    btn.textContent = '⏸ PAUSE';
+    btn.classList.remove('pause-active');
+    if (shouldAiPlayNext()) setTimeout(triggerAiMove, 300);
+  }
+}
+
+function restartGame() {
+  isPaused = false;
+  const btn = document.getElementById('btnPause');
+  btn.textContent = '⏸ PAUSE';
+  btn.classList.remove('pause-active');
+  startGame();
+}
+
 // ================================================================
 //  POIDS IA
 // ================================================================
