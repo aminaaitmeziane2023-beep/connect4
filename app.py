@@ -135,6 +135,9 @@ def ai_move():
     else:  # 1player
         ai_type = session.get("ai2")  # ai2 = IA adverse
 
+    # Calculer les scores de toutes les colonnes pour affichage
+    col_scores = _compute_all_scores(game, ai_type, depth)
+
     col = _compute_ai_move(game, ai_type, depth)
     if col is None:
         return jsonify({"error": "Aucun coup disponible"}), 400
@@ -143,7 +146,7 @@ def ai_move():
     _persist_move(game, col)
     session["board"] = game.board_to_str()
 
-    return jsonify({"ok": True, "col": col, "state": game.to_dict()})
+    return jsonify({"ok": True, "col": col, "state": game.to_dict(), "scores": col_scores})
 
 
 @app.route("/api/state", methods=["GET"])
@@ -248,6 +251,26 @@ def _format_party(gid, mode, ai1, ai2, winner, created_at, source):
 # ------------------------------------------------------------------ #
 #  Helpers                                                              #
 # ------------------------------------------------------------------ #
+
+def _compute_all_scores(game: Connect4, ai_type: str, depth: int) -> dict:
+    """Retourne les scores de toutes les colonnes pour affichage."""
+    try:
+        if ai_type == "random":
+            return {}
+        elif ai_type == "ia":
+            ai = get_db_ai()
+            if ai:
+                raw = ai.get_all_scores(game)
+            else:
+                raw = minmax_ai.get_all_scores(game, depth)
+        else:
+            raw = minmax_ai.get_all_scores(game, depth)
+        # Normaliser pour l'affichage : convertir en str keys pour JSON
+        return {str(k): v for k, v in raw.items()}
+    except Exception as e:
+        logger.warning(f"Erreur scores: {e}")
+        return {}
+
 
 def _compute_ai_move(game: Connect4, ai_type: str, depth: int) -> int | None:
     if ai_type == "random":

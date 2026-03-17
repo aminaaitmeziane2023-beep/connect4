@@ -375,6 +375,28 @@
     background: rgba(58,123,255,0.12);
   }
 
+  
+  .col-btn-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+  }
+  .col-weight {
+    font-size: 0.52rem;
+    font-family: var(--font-head);
+    color: var(--dim);
+    height: 14px;
+    line-height: 14px;
+    transition: all 0.3s;
+    letter-spacing: 0.02em;
+  }
+  .col-weight.best  { color: #00e676; font-weight: 700; }
+  .col-weight.good  { color: #3a7bff; }
+  .col-weight.bad   { color: #f44336; }
+  .col-weight.win   { color: #00e676; font-weight: 900; font-size: 0.6rem; }
+  .col-weight.block { color: #ff9800; font-weight: 700; }
+
   </style>
 </head>
 <body>
@@ -541,13 +563,24 @@ function buildBoard() {
 
   // Boutons colonnes
   for (let c = 0; c < COLS; c++) {
+    const wrap = document.createElement('div');
+    wrap.className = 'col-btn-wrap';
+
     const btn = document.createElement('button');
     btn.className = 'col-btn';
     btn.id = `colbtn-${c}`;
     btn.innerHTML = `<span>▼</span>`;
     btn.title = `Colonne ${c}`;
     btn.onclick = () => humanPlay(c);
-    colBtns.appendChild(btn);
+
+    const wt = document.createElement('div');
+    wt.className = 'col-weight';
+    wt.id = `colweight-${c}`;
+    wt.textContent = '';
+
+    wrap.appendChild(btn);
+    wrap.appendChild(wt);
+    colBtns.appendChild(wrap);
   }
 }
 
@@ -580,6 +613,7 @@ function updateDepth0() {
 //  NOUVELLE PARTIE
 // ================================================================
 async function startGame() {
+  clearWeights();
   const mode = document.getElementById('modeSelect').value;
   currentMode = mode;
 
@@ -642,6 +676,51 @@ async function humanPlay(col) {
 
 // ================================================================
 //  COUP IA
+
+// ================================================================
+//  POIDS IA
+// ================================================================
+function showWeights(scores, bestCol, aiType) {
+  if (!scores || Object.keys(scores).length === 0) return;
+
+  // Trouver min/max pour normalisation visuelle
+  const vals = Object.values(scores).filter(v => Math.abs(v) < 900000);
+  const maxVal = vals.length ? Math.max(...vals) : 1;
+  const minVal = vals.length ? Math.min(...vals) : 0;
+  const range  = maxVal - minVal || 1;
+
+  for (let c = 0; c < COLS; c++) {
+    const el = document.getElementById(`colweight-${c}`);
+    if (!el) continue;
+    const raw = scores[String(c)];
+    if (raw === undefined) { el.textContent = ''; el.className = 'col-weight'; continue; }
+
+    el.className = 'col-weight';
+
+    if (raw >= 900000) {
+      el.textContent = '★ WIN';
+      el.classList.add('win');
+    } else if (raw >= 400000) {
+      el.textContent = '⚠ BLOC';
+      el.classList.add('block');
+    } else {
+      // Score normalisé 0-100
+      const norm = Math.round(((raw - minVal) / range) * 100);
+      el.textContent = norm + '%';
+      if (c === bestCol)         el.classList.add('best');
+      else if (norm >= 60)       el.classList.add('good');
+      else if (norm <= 30)       el.classList.add('bad');
+    }
+  }
+}
+
+function clearWeights() {
+  for (let c = 0; c < COLS; c++) {
+    const el = document.getElementById(`colweight-${c}`);
+    if (el) { el.textContent = ''; el.className = 'col-weight'; }
+  }
+}
+
 // ================================================================
 async function triggerAiMove() {
   if (!gameActive || !state || state.game_over) return;
@@ -661,6 +740,8 @@ async function triggerAiMove() {
     state = data.state;
     renderBoard();
     updateStatus();
+    if (data.scores) showWeights(data.scores, data.col, currentAiType());
+    if (state.game_over) setTimeout(clearWeights, 2000);
     // Mode 0 joueur : chaîner
     if (!state.game_over && currentMode === '0player') {
       setTimeout(triggerAiMove, 700);
@@ -668,6 +749,11 @@ async function triggerAiMove() {
       setTimeout(triggerAiMove, 400);
     }
   }
+}
+
+function currentAiType() {
+  if (currentMode === '0player') return document.getElementById('ai2Select0')?.value || 'minmax';
+  return document.getElementById('ai2Select')?.value || 'minmax';
 }
 
 function shouldAiPlayNext() {

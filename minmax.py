@@ -156,3 +156,35 @@ def get_best_move(game, depth=4):
 
     col, _ = minimax(game, depth, -math.inf, math.inf, True, game.current_player)
     return col
+
+
+def get_all_scores(game, depth=4):
+    """Retourne un dict {col: score} pour toutes les colonnes valides."""
+    import math
+    valid = game.get_valid_columns()
+    if not valid:
+        return {}
+
+    ai_player = game.current_player
+    scores = {}
+
+    if depth == 0:
+        for col in valid:
+            g2 = game.copy()
+            g2.drop_piece(col)
+            if g2.game_over and g2.winner == ai_player:
+                scores[col] = 10_000_000
+            else:
+                scores[col] = evaluate_board(g2, ai_player)
+        return scores
+
+    for col in valid:
+        g2 = game.copy()
+        g2.drop_piece(col)
+        if g2.game_over and g2.winner == ai_player:
+            scores[col] = 10_000_000
+            continue
+        _, score = minimax(g2, depth - 1, -math.inf, math.inf, False, ai_player)
+        scores[col] = score
+
+    return scores

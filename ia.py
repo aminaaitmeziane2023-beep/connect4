@@ -157,6 +157,48 @@ class DatabaseAI:
         return minmax_ai.get_best_move(game, depth)
 
 
+    def get_all_scores(self, game) -> dict:
+        """Retourne {col: score_normalisé} pour affichage des poids."""
+        import math
+        valid = game.get_valid_columns()
+        if not valid:
+            return {}
+
+        scores = {}
+
+        # Vérifier coups gagnants / blocages
+        opponent = YELLOW if game.current_player == RED else RED
+        for col in valid:
+            g = _clone_and_play(game, col)
+            if g and g.winner == game.current_player:
+                scores[col] = 999999   # coup gagnant
+                continue
+            g2 = _clone_and_play_as(game, col, opponent)
+            if g2 and g2.winner == opponent:
+                scores[col] = 500000   # blocage nécessaire
+                continue
+
+        # Scores DB
+        col_stats = self.knowledge.get(game.board_to_str(), {})
+        for col in valid:
+            if col in scores:
+                continue
+            stats = col_stats.get(col, col_stats.get(str(col), None))
+            if stats:
+                total = stats['win'] + stats['loss'] + stats['draw']
+                if total >= 1:
+                    score = (stats['win'] + 0.5 * stats['draw']) / total
+                    scores[col] = round(score * 100)   # 0-100
+                    continue
+            # Fallback MinMax score
+            mm_scores = minmax_ai.get_all_scores(game, _adaptive_depth(game))
+            for c, s in mm_scores.items():
+                if c not in scores:
+                    scores[c] = s
+
+        return scores
+
+
 def _adaptive_depth(game: Connect4) -> int:
     """Profondeur MinMax adaptée au stade de la partie."""
     ply = game.ply
