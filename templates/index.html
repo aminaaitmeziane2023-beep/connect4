@@ -397,6 +397,31 @@
   .col-weight.win   { color: #00e676; font-weight: 900; font-size: 0.6rem; }
   .col-weight.block { color: #ff9800; font-weight: 700; }
 
+  
+  .control-btns {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .ctrl-btn {
+    background: #1a1a2e;
+    border: 1px solid #2a2a4a;
+    color: #aaa;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: var(--font-head);
+    font-size: 0.62rem;
+    letter-spacing: 0.05em;
+    transition: all 0.2s;
+  }
+  .ctrl-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .ctrl-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .ctrl-btn.pause-active { border-color: #ff9800; color: #ff9800; background: rgba(255,152,0,0.1); }
+  .ctrl-btn.danger:hover:not(:disabled) { border-color: #f44336; color: #f44336; }
+
   </style>
 </head>
 <body>
@@ -472,6 +497,12 @@
 
     <button class="btn-start" onclick="startGame()">▶ NOUVELLE PARTIE</button>
     <a href="/historique" class="btn-start" id="btnHistorique" style="display:block;text-align:center;text-decoration:none;">📋 HISTORIQUE</a>
+
+    <div class="control-btns" id="controlBtns">
+      <button class="ctrl-btn" id="btnUndo"    onclick="undoMove()"   disabled title="Annuler le dernier coup">↩ UNDO</button>
+      <button class="ctrl-btn" id="btnPause"   onclick="togglePause()" disabled>⏸ PAUSE</button>
+      <button class="ctrl-btn danger" id="btnRestart" onclick="restartGame()" disabled title="Rejouer même config">↺ RESTART</button>
+    </div>
   </div>
 
   <!-- ===== PLATEAU ===== -->
@@ -541,6 +572,7 @@ let humanColor = RED;
 let currentMode = '1player';
 let gameActive = false;
 let isAiTurn = false;
+let isPaused = false;
 
 // ================================================================
 //  INITIALISATION DU DOM
@@ -638,8 +670,10 @@ async function startGame() {
   if (data.ok) {
     state = data.state;
     gameActive = true;
+    isPaused = false;
     renderBoard();
     updateStatus();
+    updateControlBtns();
     // Si IA joue en premier
     if (shouldAiPlayNext()) {
       setTimeout(triggerAiMove, 500);
@@ -668,6 +702,7 @@ async function humanPlay(col) {
     state = data.state;
     renderBoard();
     updateStatus();
+    updateControlBtns();
     if (!state.game_over && shouldAiPlayNext()) {
       setTimeout(triggerAiMove, 400);
     }
@@ -723,7 +758,7 @@ function clearWeights() {
 
 // ================================================================
 async function triggerAiMove() {
-  if (!gameActive || !state || state.game_over) return;
+  if (!gameActive || !state || state.game_over || isPaused) return;
   isAiTurn = true;
   setThinking(true);
 
@@ -742,6 +777,7 @@ async function triggerAiMove() {
     updateStatus();
     if (data.scores) showWeights(data.scores, data.col, currentAiType());
     if (state.game_over) setTimeout(clearWeights, 2000);
+    updateControlBtns();
     // Mode 0 joueur : chaîner
     if (!state.game_over && currentMode === '0player') {
       setTimeout(triggerAiMove, 700);

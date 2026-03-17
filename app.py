@@ -72,6 +72,7 @@ def new_game():
     session["depth"] = depth
     session["human_color"] = human_color
     session["game_id"] = None
+    session["history"] = []
 
     # Persister en DB
     try:
@@ -106,6 +107,11 @@ def play():
         if game.current_player != human_color:
             return jsonify({"error": "C'est le tour de l'IA"}), 400
 
+    # Sauvegarder état avant coup pour undo
+    history = session.get("history", [])
+    history.append(game.board_to_str())
+    session["history"] = history[-40:]  # garder max 40 coups
+
     if not game.drop_piece(col):
         return jsonify({"error": "Coup invalide"}), 400
 
@@ -114,6 +120,34 @@ def play():
 
     return jsonify({"ok": True, "state": game.to_dict()})
 
+
+
+
+@app.route("/api/undo", methods=["POST"])
+def undo():
+    """Annule le(s) dernier(s) coup(s) selon le mode."""
+    grid_str = session.get("board")
+    if not grid_str:
+        return jsonify({"error": "Pas de partie"}), 400
+
+    history = session.get("history", [])
+    if not history:
+        return jsonify({"error": "Rien à annuler"}), 400
+
+    mode = session.get("mode", "1player")
+
+    # En mode 1 joueur : annuler 2 coups (humain + IA) sauf si < 2 coups
+    nb_undo = 2 if mode == "1player" and len(history) >= 2 else 1
+
+    for _ in range(nb_undo):
+        if history:
+            grid_str = history.pop()
+
+    session["board"] = grid_str
+    session["history"] = history
+
+    game = Connect4.from_str(grid_str)
+    return jsonify({"ok": True, "state": game.to_dict()})
 
 @app.route("/api/ai_move", methods=["POST"])
 def ai_move():
@@ -141,6 +175,11 @@ def ai_move():
     col = _compute_ai_move(game, ai_type, depth)
     if col is None:
         return jsonify({"error": "Aucun coup disponible"}), 400
+
+    # Sauvegarder état avant coup pour undo
+    history = session.get("history", [])
+    history.append(game.board_to_str())
+    session["history"] = history[-40:]
 
     game.drop_piece(col)
     _persist_move(game, col)
@@ -285,6 +324,13 @@ def _compute_ai_move(game: Connect4, ai_type: str, depth: int) -> int | None:
 
 
 def _persist_move(game: Connect4, col: int):
+    # Sauvegarder l'historique des boards pour undo
+    # On sauvegarde AVANT le coup (donc le board courant avant drop)
+    # En pratique on sauvegarde après le drop, donc on garde l'état précédent
+    history = session.get("history", [])
+    # L'état avant ce coup = on reconstruit depuis l'historique
+    # On ne peut pas revenir en arrière sur le board actuel (coup déjà joué)
+    # Donc on stocke l'état AVANT chaque coup dans la route play/ai_move
     gid = session.get("game_id")
     if not gid:
         return
