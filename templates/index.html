@@ -422,6 +422,15 @@
   .ctrl-btn.pause-active { border-color: #ff9800; color: #ff9800; background: rgba(255,152,0,0.1); }
   .ctrl-btn.danger:hover:not(:disabled) { border-color: #f44336; color: #f44336; }
 
+  
+  .ctrl-btn.hint-active { border-color: #00e676; color: #00e676; background: rgba(0,230,118,0.08); }
+  .cell.hint-col { box-shadow: inset 0 0 0 3px #00e676; animation: hint-pulse 0.8s ease-in-out infinite alternate; }
+  .col-btn.hint-col { border-color: #00e676 !important; color: #00e676 !important; background: rgba(0,230,118,0.12) !important; }
+  @keyframes hint-pulse {
+    from { box-shadow: inset 0 0 0 3px rgba(0,230,118,0.4); }
+    to   { box-shadow: inset 0 0 0 3px rgba(0,230,118,1); }
+  }
+
   </style>
 </head>
 <body>
@@ -502,6 +511,7 @@
       <button class="ctrl-btn" id="btnUndo"    onclick="undoMove()"   disabled title="Annuler le dernier coup">↩ UNDO</button>
       <button class="ctrl-btn" id="btnPause"   onclick="togglePause()" disabled>⏸ PAUSE</button>
       <button class="ctrl-btn danger" id="btnRestart" onclick="restartGame()" disabled title="Rejouer même config">↺ RESTART</button>
+      <button class="ctrl-btn" id="btnHint" onclick="getHint()" disabled title="Meilleur coup suggéré">💡 HINT</button>
     </div>
   </div>
 
@@ -685,6 +695,7 @@ async function startGame() {
 //  COUP HUMAIN
 // ================================================================
 async function humanPlay(col) {
+  clearHint();
   if (!gameActive || !state || state.game_over) return;
   if (isAiTurn) return;
   if (currentMode === '0player') return;
@@ -713,6 +724,63 @@ async function humanPlay(col) {
 //  COUP IA
 
 
+
+// ================================================================
+//  HINT
+// ================================================================
+let hintCol = null;
+
+async function getHint() {
+  if (!gameActive || isPaused || isAiTurn) return;
+  if (currentMode !== '1player') return;
+
+  const btn = document.getElementById('btnHint');
+  btn.textContent = '💡 ...';
+  btn.disabled = true;
+
+  try {
+    const res  = await fetch('/api/hint', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
+    const data = await res.json();
+    if (data.ok) {
+      hintCol = data.hint_col;
+      showWeights(data.scores, data.hint_col, 'minmax');
+      highlightHint(hintCol);
+      // Effacer après 3 secondes
+      setTimeout(() => {
+        clearHint();
+        clearWeights();
+      }, 3000);
+    }
+  } catch(e) {}
+
+  btn.textContent = '💡 HINT';
+  btn.disabled = false;
+}
+
+function highlightHint(col) {
+  clearHint();
+  hintCol = col;
+  // Surligner le bouton colonne
+  const btn = document.getElementById(`colbtn-${col}`);
+  if (btn) btn.classList.add('hint-col');
+  // Surligner toutes les cellules de cette colonne
+  for (let r = 0; r < ROWS; r++) {
+    const cell = document.getElementById(`cell-${r}-${col}`);
+    if (cell) cell.classList.add('hint-col');
+  }
+}
+
+function clearHint() {
+  if (hintCol === null) return;
+  const btn = document.getElementById(`colbtn-${hintCol}`);
+  if (btn) btn.classList.remove('hint-col');
+  for (let r = 0; r < ROWS; r++) {
+    const cell = document.getElementById(`cell-${r}-${hintCol}`);
+    if (cell) cell.classList.remove('hint-col');
+  }
+  hintCol = null;
+}
+
 // ================================================================
 //  CONTRÔLES : UNDO / PAUSE / RESTART
 // ================================================================
@@ -723,6 +791,7 @@ function updateControlBtns() {
   document.getElementById('btnUndo').disabled    = !hasHistory || isPaused;
   document.getElementById('btnPause').disabled   = !notOver;
   document.getElementById('btnRestart').disabled = !hasGame;
+  document.getElementById('btnHint').disabled = !notOver || currentMode !== '1player' || isAiTurn;
 }
 
 async function undoMove() {
@@ -731,6 +800,7 @@ async function undoMove() {
   const data = await res.json();
   if (data.ok) {
     state = data.state;
+    clearHint();
     clearWeights();
     renderBoard();
     updateStatus();
@@ -753,6 +823,7 @@ function togglePause() {
 }
 
 function restartGame() {
+  clearHint();
   isPaused = false;
   const btn = document.getElementById('btnPause');
   btn.textContent = '⏸ PAUSE';

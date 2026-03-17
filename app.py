@@ -123,6 +123,28 @@ def play():
 
 
 
+
+@app.route("/api/hint", methods=["POST"])
+def hint():
+    """Suggère la meilleure colonne pour le joueur humain."""
+    grid_str = session.get("board")
+    if not grid_str:
+        return jsonify({"error": "Pas de partie"}), 400
+
+    game = Connect4.from_str(grid_str)
+    if game.game_over:
+        return jsonify({"error": "Partie terminée"}), 400
+
+    depth = session.get("depth", 4)
+    best_col = minmax_ai.get_best_move(game, depth)
+    all_scores = minmax_ai.get_all_scores(game, depth)
+
+    return jsonify({
+        "ok": True,
+        "hint_col": best_col,
+        "scores": {str(k): v for k, v in all_scores.items()}
+    })
+
 @app.route("/api/undo", methods=["POST"])
 def undo():
     """Annule le(s) dernier(s) coup(s) selon le mode."""
