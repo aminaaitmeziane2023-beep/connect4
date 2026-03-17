@@ -1,11 +1,21 @@
-# ia.py — IA par apprentissage depuis la base de données
-# Utilise les tables games (winner, is_draw) et states (grid_str).
+# ia.py — IA hybride : Base de données + MinMax
+# Stratégie :
+#   1. Toujours vérifier si un coup gagnant immédiat existe → jouer
+#   2. Toujours bloquer une victoire adverse immédiate → bloquer
+#   3. Si état connu en DB avec score fiable (≥5 parties) → suivre la DB
+#   4. Sinon → MinMax profondeur adaptative
 
 import random
 import logging
 from game import Connect4, RED, YELLOW, COLS
+import minmax as minmax_ai
 
 logger = logging.getLogger(__name__)
+
+# Seuil minimum de parties vues pour faire confiance à la DB
+MIN_CONFIDENCE = 5
+# Score minimum pour préférer la DB (évite de suivre des coups perdants)
+MIN_SCORE = 0.45
 
 
 def build_knowledge_base(conn) -> dict:
@@ -15,7 +25,6 @@ def build_knowledge_base(conn) -> dict:
     """
     knowledge: dict = {}
 
-    # 1. Récupérer les résultats des parties terminées
     try:
         cur = conn.cursor()
         try:
@@ -40,26 +49,23 @@ def build_knowledge_base(conn) -> dict:
         return knowledge
     logger.info(f"Parties terminées: {len(game_results)}")
 
-    # 2. Récupérer les états de ces parties (par batch de 500 pour éviter les timeouts)
     all_states = []
     gids = list(game_results.keys())
-    batch_size = 500
-    for i in range(0, len(gids), batch_size):
-        batch = gids[i:i+batch_size]
+    for i in range(0, len(gids), 500):
+        batch = gids[i:i+500]
         try:
             cur = conn.cursor()
-            placeholder = ','.join(['%s'] * len(batch))
+            ph = ','.join(['%s'] * len(batch))
             cur.execute(
                 f"SELECT game_id, ply, grid_str FROM states "
-                f"WHERE game_id IN ({placeholder}) ORDER BY game_id, ply",
+                f"WHERE game_id IN ({ph}) ORDER BY game_id, ply",
                 batch
             )
             all_states.extend(cur.fetchall())
             cur.close()
         except Exception as e:
-            logger.error(f"Erreur lecture states batch {i}: {e}")
+            logger.error(f"Erreur states batch {i}: {e}")
 
-    # 3. Grouper par partie
     by_game: dict = {}
     for game_id, ply, grid_str in all_states:
         if grid_str:
@@ -71,18 +77,15 @@ def build_knowledge_base(conn) -> dict:
         if len(plies) < 2:
             continue
         winner_char, is_draw = game_results.get(game_id, (None, 0))
-
         for i in range(len(plies) - 1):
             curr_grid = plies[i][1]
             next_grid = plies[i+1][1]
             col = _find_column_played(curr_grid, next_grid)
             if col is None:
                 continue
-
             r = curr_grid.count('R')
             j = curr_grid.count('J')
             curr_char = 'R' if r == j else 'J'
-
             stats = knowledge.setdefault(curr_grid, {}).setdefault(
                 col, {'win': 0, 'loss': 0, 'draw': 0}
             )
@@ -114,6 +117,22 @@ class DatabaseAI:
         if not valid:
             return None
 
+        # ── 1. Coup gagnant immédiat ──────────────────────────────────
+        for col in valid:
+            g = _clone_and_play(game, col)
+            if g and g.winner == game.current_player:
+                logger.debug(f"IA DB: coup gagnant immédiat col={col}")
+                return col
+
+        # ── 2. Bloquer victoire adverse ───────────────────────────────
+        opponent = YELLOW if game.current_player == RED else RED
+        for col in valid:
+            g = _clone_and_play_as(game, col, opponent)
+            if g and g.winner == opponent:
+                logger.debug(f"IA DB: blocage adverse col={col}")
+                return col
+
+        # ── 3. Consulter la base de données ───────────────────────────
         col_stats = self.knowledge.get(game.board_to_str(), {})
         best_col, best_score, best_total = None, -1.0, 0
 
@@ -122,14 +141,45 @@ class DatabaseAI:
             if col_int not in valid:
                 continue
             total = stats['win'] + stats['loss'] + stats['draw']
-            if total == 0:
+            if total < MIN_CONFIDENCE:
                 continue
             score = (stats['win'] + 0.5 * stats['draw']) / total
             if score > best_score or (score == best_score and total > best_total):
                 best_score, best_col, best_total = score, col_int, total
 
-        if best_col is not None:
-            logger.debug(f"IA DB col={best_col} score={best_score:.2f} n={best_total}")
+        if best_col is not None and best_score >= MIN_SCORE:
+            logger.debug(f"IA DB: col={best_col} score={best_score:.2f} n={best_total}")
             return best_col
 
-        return random.choice(valid)
+        # ── 4. Fallback MinMax (profondeur selon stade de la partie) ──
+        depth = _adaptive_depth(game)
+        logger.debug(f"IA DB: fallback MinMax profondeur={depth}")
+        return minmax_ai.get_best_move(game, depth)
+
+
+def _adaptive_depth(game: Connect4) -> int:
+    """Profondeur MinMax adaptée au stade de la partie."""
+    ply = game.ply
+    if ply < 10:
+        return 3   # début : rapide
+    elif ply < 30:
+        return 4   # milieu
+    else:
+        return 5   # fin : plus de réflexion
+
+
+def _clone_and_play(game: Connect4, col: int):
+    """Clone la partie et joue col avec le joueur courant."""
+    g = Connect4.from_str(game.board_to_str())
+    if g.drop_piece(col):
+        return g
+    return None
+
+
+def _clone_and_play_as(game: Connect4, col: int, player: int):
+    """Clone et joue comme si c'était le tour de player."""
+    g = Connect4.from_str(game.board_to_str())
+    g.current_player = player
+    if g.drop_piece(col):
+        return g
+    return None
