@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PUISSANCE 4 — 9×9</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #060914;
+    --panel: #0d1528;
+    --border: #1a2a4a;
+    --red: #ff2d4e;
+    --red-glow: rgba(255,45,78,0.6);
+    --yellow: #ffd700;
+    --yellow-glow: rgba(255,215,0,0.6);
+    --empty: #111d35;
+    --grid-line: #1e3060;
+    --text: #c8d8f0;
+    --dim: #4a6080;
+    --win: #00ffaa;
+    --accent: #3a7bff;
+    --font-head: 'Orbitron', monospace;
+    --font-mono: 'Share Tech Mono', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-mono);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 10px 40px;
+    background-image:
+      radial-gradient(ellipse at 20% 20%, rgba(58,123,255,0.06) 0%, transparent 60%),
+      radial-gradient(ellipse at 80% 80%, rgba(255,45,78,0.05) 0%, transparent 60%);
+  }
+
+  /* ===== HEADER ===== */
+  header {
+    text-align: center;
+    margin-bottom: 28px;
+  }
+  .title {
+    font-family: var(--font-head);
+    font-size: clamp(1.6rem, 5vw, 3rem);
+    font-weight: 900;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    background: linear-gradient(135deg, var(--red) 0%, var(--yellow) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow: none;
+    filter: drop-shadow(0 0 12px rgba(255,215,0,0.3));
+  }
+  .subtitle {
+    font-size: 0.75rem;
+    letter-spacing: 0.35em;
+    color: var(--dim);
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+
+  /* ===== LAYOUT ===== */
+  .main-layout {
+    display: flex;
+    gap: 22px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    justify-content: center;
+    width: 100%;
+    max-width: 1100px;
+  }
+
+  /* ===== PANELS ===== */
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px;
+  }
+  .panel-title {
+    font-family: var(--font-head);
+    font-size: 0.65rem;
+    letter-spacing: 0.25em;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 8px;
+  }
+
+  /* ===== CONTROLS ===== */
+  .controls { min-width: 220px; }
+
+  .control-group { margin-bottom: 16px; }
+  .control-group label {
+    display: block;
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    color: var(--dim);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+  }
+  select, input[type=range] {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    padding: 7px 10px;
+    appearance: none;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  select:hover, select:focus { border-color: var(--accent); }
+  input[type=range] { padding: 4px 0; cursor: pointer; accent-color: var(--accent); }
+
+  .depth-display {
+    font-size: 0.75rem;
+    color: var(--yellow);
+    text-align: right;
+    margin-top: 4px;
+  }
+
+  /* Color picker buttons */
+  .color-btns { display: flex; gap: 8px; }
+  .color-btn {
+    flex: 1;
+    padding: 8px;
+    border: 2px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg);
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    transition: all 0.2s;
+    text-align: center;
+  }
+  .color-btn.red { color: var(--red); }
+  .color-btn.yellow { color: var(--yellow); }
+  .color-btn.active.red { border-color: var(--red); background: rgba(255,45,78,0.12); box-shadow: 0 0 8px var(--red-glow); }
+  .color-btn.active.yellow { border-color: var(--yellow); background: rgba(255,215,0,0.1); box-shadow: 0 0 8px var(--yellow-glow); }
+
+  .ai-section { display: none; }
+  .ai-section.visible { display: block; }
+
+  /* START button */
+  .btn-start {
+    width: 100%;
+    padding: 12px;
+    background: linear-gradient(135deg, #1a3a6a 0%, #0d1f3a 100%);
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    color: var(--accent);
+    font-family: var(--font-head);
+    font-size: 0.8rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 0 12px rgba(58,123,255,0.2);
+    margin-top: 4px;
+  }
+  .btn-start:hover {
+    background: linear-gradient(135deg, #1f4a8a 0%, #112850 100%);
+    box-shadow: 0 0 20px rgba(58,123,255,0.4);
+    transform: translateY(-1px);
+  }
+  .btn-start:active { transform: translateY(0); }
+
+  /* ===== STATUS ===== */
+  .status-panel { min-width: 220px; }
+
+  .turn-indicator {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    margin-bottom: 14px;
+    transition: all 0.3s;
+    background: var(--bg);
+  }
+  .turn-dot {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    transition: all 0.3s;
+  }
+  .turn-dot.red  { background: var(--red);    box-shadow: 0 0 10px var(--red-glow); }
+  .turn-dot.yellow { background: var(--yellow); box-shadow: 0 0 10px var(--yellow-glow); }
+  .turn-dot.none { background: var(--empty); }
+  .turn-text { font-size: 0.8rem; letter-spacing: 0.05em; }
+
+  .score-board { display: flex; gap: 8px; margin-bottom: 14px; }
+  .score-item {
+    flex: 1;
+    text-align: center;
+    padding: 10px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+  }
+  .score-name { font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 4px; }
+  .score-name.red { color: var(--red); }
+  .score-name.yellow { color: var(--yellow); }
+  .score-val { font-family: var(--font-head); font-size: 1.4rem; font-weight: 700; }
+
+  .ply-counter {
+    font-size: 0.75rem;
+    color: var(--dim);
+    text-align: center;
+    margin-bottom: 12px;
+    letter-spacing: 0.1em;
+  }
+
+  .message-box {
+    padding: 10px 14px;
+    border-radius: 4px;
+    font-size: 0.82rem;
+    letter-spacing: 0.05em;
+    min-height: 42px;
+    display: flex;
+    align-items: center;
+    transition: all 0.3s;
+  }
+  .message-box.info { border: 1px solid var(--border); background: var(--bg); color: var(--dim); }
+  .message-box.red-win { border: 1px solid var(--red); background: rgba(255,45,78,0.08); color: var(--red); }
+  .message-box.yellow-win { border: 1px solid var(--yellow); background: rgba(255,215,0,0.08); color: var(--yellow); }
+  .message-box.draw { border: 1px solid var(--win); background: rgba(0,255,170,0.06); color: var(--win); }
+
+  /* Stats */
+  .stats-panel { margin-top: 12px; }
+  .stat-row { display: flex; justify-content: space-between; font-size: 0.72rem; padding: 4px 0; border-bottom: 1px solid var(--border); }
+  .stat-label { color: var(--dim); }
+  .stat-value { color: var(--text); }
+
+  /* ===== GAME BOARD ===== */
+  .board-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* Column click indicators */
+  .col-buttons {
+    display: grid;
+    grid-template-columns: repeat(9, 1fr);
+    gap: 4px;
+    margin-bottom: 6px;
+    width: 100%;
+  }
+  .col-btn {
+    height: 28px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.65rem;
+    color: transparent;
+    transition: all 0.18s;
+    font-family: var(--font-mono);
+  }
+  .col-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .col-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(58,123,255,0.08); }
+  .col-btn:disabled { cursor: not-allowed; opacity: 0.3; }
+  .col-btn span { font-size: 0.9rem; line-height: 1; }
+
+  /* Board grid */
+  .board {
+    display: grid;
+    grid-template-columns: repeat(9, 1fr);
+    grid-template-rows: repeat(9, 1fr);
+    gap: 5px;
+    padding: 12px;
+    background: #0a1428;
+    border: 2px solid var(--grid-line);
+    border-radius: 10px;
+    box-shadow:
+      0 0 40px rgba(58,123,255,0.08),
+      inset 0 0 20px rgba(0,0,0,0.4);
+  }
+
+  .cell {
+    width: clamp(36px, 5.5vw, 58px);
+    height: clamp(36px, 5.5vw, 58px);
+    border-radius: 50%;
+    background: var(--empty);
+    border: 1px solid var(--grid-line);
+    transition: transform 0.15s, box-shadow 0.15s;
+    position: relative;
+    overflow: hidden;
+  }
+  .cell::after {
+    content: '';
+    position: absolute;
+    top: 12%;
+    left: 20%;
+    width: 28%;
+    height: 22%;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.06);
+    pointer-events: none;
+  }
+  .cell.red {
+    background: radial-gradient(circle at 35% 30%, #ff5060, var(--red) 60%, #8b0010);
+    box-shadow: 0 0 8px var(--red-glow), inset 0 -2px 4px rgba(0,0,0,0.4);
+    border-color: transparent;
+    animation: dropIn 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .cell.yellow {
+    background: radial-gradient(circle at 35% 30%, #ffe44d, var(--yellow) 60%, #8b7000);
+    box-shadow: 0 0 8px var(--yellow-glow), inset 0 -2px 4px rgba(0,0,0,0.4);
+    border-color: transparent;
+    animation: dropIn 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .cell.winning {
+    animation: pulse-win 0.8s ease-in-out infinite alternate;
+  }
+  .cell.winning.red  { box-shadow: 0 0 20px var(--red-glow), inset 0 -2px 4px rgba(0,0,0,0.4); }
+  .cell.winning.yellow { box-shadow: 0 0 20px var(--yellow-glow), inset 0 -2px 4px rgba(0,0,0,0.4); }
+
+  @keyframes dropIn {
+    from { transform: scale(0.3); opacity: 0.5; }
+    to   { transform: scale(1);   opacity: 1; }
+  }
+  @keyframes pulse-win {
+    from { filter: brightness(1); }
+    to   { filter: brightness(1.4) saturate(1.3); }
+  }
+
+  /* AI thinking */
+  .thinking-indicator {
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--accent);
+    letter-spacing: 0.2em;
+    height: 22px;
+    margin-top: 8px;
+    animation: blink 0.8s step-end infinite;
+    display: none;
+  }
+  .thinking-indicator.active { display: block; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* Responsive */
+  @media (max-width: 700px) {
+    .main-layout { flex-direction: column; align-items: center; }
+    .controls, .status-panel { width: 100%; max-width: 500px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="title">Puissance 4</div>
+  <div class="subtitle">Grille 9×9 · 4 à la suite · IA intégrée</div>
+</header>
+
+<div class="main-layout">
+
+  <!-- ===== PANNEAU CONFIGURATION ===== -->
+  <div class="panel controls">
+    <div class="panel-title">⚙ Configuration</div>
+
+    <div class="control-group">
+      <label>Mode de jeu</label>
+      <select id="modeSelect" onchange="onModeChange()">
+        <option value="1player">1 Joueur (vs IA)</option>
+        <option value="2player">2 Joueurs (local)</option>
+        <option value="0player">0 Joueur (IA vs IA)</option>
+      </select>
+    </div>
+
+    <!-- 1 joueur -->
+    <div class="ai-section" id="section1p">
+      <div class="control-group">
+        <label>Votre couleur</label>
+        <div class="color-btns">
+          <button class="color-btn red active" id="btnRed" onclick="selectColor(1)">🔴 Rouge</button>
+          <button class="color-btn yellow" id="btnYellow" onclick="selectColor(2)">🟡 Jaune</button>
+        </div>
+      </div>
+      <div class="control-group">
+        <label>Type d'IA</label>
+        <select id="ai2Select">
+          <option value="minmax">MinMax</option>
+          <option value="random">Aléatoire</option>
+          <option value="ia">IA (base de données)</option>
+        </select>
+      </div>
+      <div class="control-group" id="depthGroup1p">
+        <label>Profondeur MinMax</label>
+        <input type="range" id="depthRange" min="0" max="6" value="4" oninput="updateDepth()">
+        <div class="depth-display" id="depthDisplay">Profondeur : 4</div>
+      </div>
+    </div>
+
+    <!-- 0 joueur -->
+    <div class="ai-section" id="section0p">
+      <div class="control-group">
+        <label>IA Rouge</label>
+        <select id="ai1Select">
+          <option value="minmax">MinMax</option>
+          <option value="random">Aléatoire</option>
+          <option value="ia">IA (base de données)</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label>IA Jaune</label>
+        <select id="ai2Select0">
+          <option value="random">Aléatoire</option>
+          <option value="minmax">MinMax</option>
+          <option value="ia">IA (base de données)</option>
+        </select>
+      </div>
+      <div class="control-group" id="depthGroup0p">
+        <label>Profondeur MinMax</label>
+        <input type="range" id="depthRange0" min="0" max="6" value="3" oninput="updateDepth0()">
+        <div class="depth-display" id="depthDisplay0">Profondeur : 3</div>
+      </div>
+    </div>
+
+    <button class="btn-start" onclick="startGame()">▶ NOUVELLE PARTIE</button>
+  </div>
+
+  <!-- ===== PLATEAU ===== -->
+  <div class="board-wrapper">
+    <div class="col-buttons" id="colButtons">
+      <!-- Boutons colonnes générés en JS -->
+    </div>
+    <div class="board" id="board">
+      <!-- Cellules générées en JS -->
+    </div>
+    <div class="thinking-indicator" id="thinkingIndicator">⚡ IA EN TRAIN DE CALCULER…</div>
+  </div>
+
+  <!-- ===== STATUTS ===== -->
+  <div class="panel status-panel">
+    <div class="panel-title">📊 État de la partie</div>
+
+    <div class="turn-indicator" id="turnIndicator">
+      <div class="turn-dot none" id="turnDot"></div>
+      <span class="turn-text" id="turnText">Démarrez une partie</span>
+    </div>
+
+    <div class="score-board">
+      <div class="score-item">
+        <div class="score-name red">Rouge</div>
+        <div class="score-val" id="scoreRed">0</div>
+      </div>
+      <div class="score-item">
+        <div class="score-name" style="color:var(--dim)">Nul</div>
+        <div class="score-val" id="scoreDraw">0</div>
+      </div>
+      <div class="score-item">
+        <div class="score-name yellow">Jaune</div>
+        <div class="score-val" id="scoreYellow">0</div>
+      </div>
+    </div>
+
+    <div class="ply-counter" id="plyCounter">Coup : 0 / 81</div>
+
+    <div class="message-box info" id="messageBox">Choisissez votre configuration et appuyez sur ▶</div>
+
+    <div class="panel stats-panel">
+      <div class="panel-title">🗄 Base de données</div>
+      <div class="stat-row">
+        <span class="stat-label">Parties enregistrées</span>
+        <span class="stat-value" id="statGames">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">États connus (IA)</span>
+        <span class="stat-value" id="statKB">—</span>
+      </div>
+    </div>
+  </div>
+
+</div><!-- end main-layout -->
+
+<script>
+// ================================================================
+//  ÉTAT CLIENT
+// ================================================================
+const ROWS = 9, COLS = 9;
+const RED = 1, YELLOW = 2;
+
+let state = null;         // dernier état serveur
+let scores = {1:0, 0:0, 2:0};  // rouge, nul, jaune
+let humanColor = RED;
+let currentMode = '1player';
+let gameActive = false;
+let isAiTurn = false;
+
+// ================================================================
+//  INITIALISATION DU DOM
+// ================================================================
+function buildBoard() {
+  const board = document.getElementById('board');
+  const colBtns = document.getElementById('colButtons');
+  board.innerHTML = '';
+  colBtns.innerHTML = '';
+
+  // Colonnes (haut → bas visuellement : rangée 8 en premier)
+  for (let r = ROWS - 1; r >= 0; r--) {
+    for (let c = 0; c < COLS; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.id = `cell-${r}-${c}`;
+      board.appendChild(cell);
+    }
+  }
+
+  // Boutons colonnes
+  for (let c = 0; c < COLS; c++) {
+    const btn = document.createElement('button');
+    btn.className = 'col-btn';
+    btn.id = `colbtn-${c}`;
+    btn.innerHTML = `<span>▼</span>`;
+    btn.title = `Colonne ${c}`;
+    btn.onclick = () => humanPlay(c);
+    colBtns.appendChild(btn);
+  }
+}
+
+// ================================================================
+//  CONTRÔLES UI
+// ================================================================
+function onModeChange() {
+  currentMode = document.getElementById('modeSelect').value;
+  document.getElementById('section1p').classList.toggle('visible', currentMode === '1player');
+  document.getElementById('section0p').classList.toggle('visible', currentMode === '0player');
+}
+
+function selectColor(color) {
+  humanColor = color;
+  document.getElementById('btnRed').classList.toggle('active', color === RED);
+  document.getElementById('btnYellow').classList.toggle('active', color === YELLOW);
+}
+
+function updateDepth() {
+  const v = document.getElementById('depthRange').value;
+  document.getElementById('depthDisplay').textContent = `Profondeur : ${v}`;
+}
+
+function updateDepth0() {
+  const v = document.getElementById('depthRange0').value;
+  document.getElementById('depthDisplay0').textContent = `Profondeur : ${v}`;
+}
+
+// ================================================================
+//  NOUVELLE PARTIE
+// ================================================================
+async function startGame() {
+  const mode = document.getElementById('modeSelect').value;
+  currentMode = mode;
+
+  const body = { mode };
+
+  if (mode === '1player') {
+    body.ai2    = document.getElementById('ai2Select').value;
+    body.depth  = parseInt(document.getElementById('depthRange').value);
+    body.human_color = humanColor;
+  } else if (mode === '0player') {
+    body.ai1   = document.getElementById('ai1Select').value;
+    body.ai2   = document.getElementById('ai2Select0').value;
+    body.depth = parseInt(document.getElementById('depthRange0').value);
+  }
+
+  const res = await fetch('/api/new_game', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  if (data.ok) {
+    state = data.state;
+    gameActive = true;
+    renderBoard();
+    updateStatus();
+    // Si IA joue en premier
+    if (shouldAiPlayNext()) {
+      setTimeout(triggerAiMove, 500);
+    }
+  }
+}
+
+// ================================================================
+//  COUP HUMAIN
+// ================================================================
+async function humanPlay(col) {
+  if (!gameActive || !state || state.game_over) return;
+  if (isAiTurn) return;
+  if (currentMode === '0player') return;
+
+  if (currentMode === '1player' && state.current_player !== humanColor) return;
+  if (!state.valid_columns.includes(col)) return;
+
+  const res = await fetch('/api/play', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({col})
+  });
+  const data = await res.json();
+  if (data.ok) {
+    state = data.state;
+    renderBoard();
+    updateStatus();
+    if (!state.game_over && shouldAiPlayNext()) {
+      setTimeout(triggerAiMove, 400);
+    }
+  }
+}
+
+// ================================================================
+//  COUP IA
+// ================================================================
+async function triggerAiMove() {
+  if (!gameActive || !state || state.game_over) return;
+  isAiTurn = true;
+  setThinking(true);
+
+  const res = await fetch('/api/ai_move', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: '{}'
+  });
+  const data = await res.json();
+  setThinking(false);
+  isAiTurn = false;
+
+  if (data.ok) {
+    state = data.state;
+    renderBoard();
+    updateStatus();
+    // Mode 0 joueur : chaîner
+    if (!state.game_over && currentMode === '0player') {
+      setTimeout(triggerAiMove, 700);
+    } else if (!state.game_over && currentMode === '1player' && shouldAiPlayNext()) {
+      setTimeout(triggerAiMove, 400);
+    }
+  }
+}
+
+function shouldAiPlayNext() {
+  if (!state) return false;
+  if (state.game_over) return false;
+  if (currentMode === '0player') return true;
+  if (currentMode === '2player') return false;
+  // 1player: IA joue si ce n'est pas le tour de l'humain
+  return state.current_player !== humanColor;
+}
+
+// ================================================================
+//  RENDU DU PLATEAU
+// ================================================================
+function renderBoard() {
+  if (!state) return;
+  const gridStr = state.grid_str; // row 0=bas
+
+  // grid_str[i] : row = i//9, col = i%9
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const ch = gridStr[r * COLS + c];
+      const cell = document.getElementById(`cell-${r}-${c}`);
+      if (!cell) continue;
+      cell.className = 'cell';
+      if (ch === 'R') cell.classList.add('red');
+      else if (ch === 'J') cell.classList.add('yellow');
+    }
+  }
+
+  // Mettre en évidence les 4 gagnants si fin de partie
+  if (state.game_over && state.winner && state.winner !== 0) {
+    highlightWinners(state.grid_str, state.winner === RED ? 'R' : 'J');
+  }
+
+  // Activer/désactiver boutons colonnes
+  for (let c = 0; c < COLS; c++) {
+    const btn = document.getElementById(`colbtn-${c}`);
+    if (!btn) continue;
+    const canPlay = gameActive && !state.game_over
+      && state.valid_columns.includes(c)
+      && (currentMode === '2player' || (currentMode === '1player' && state.current_player === humanColor));
+    btn.disabled = !canPlay;
+    btn.classList.toggle('active', canPlay);
+  }
+}
+
+function highlightWinners(gridStr, playerChar) {
+  const b = [];
+  for (let r = 0; r < ROWS; r++) {
+    b.push([]);
+    for (let c = 0; c < COLS; c++) b[r].push(gridStr[r*COLS+c]);
+  }
+  const W = 4;
+  const mark = (positions) => {
+    for (const [r,c] of positions) {
+      const cell = document.getElementById(`cell-${r}-${c}`);
+      if (cell) cell.classList.add('winning');
+    }
+  };
+  // Horizontal
+  for (let r=0;r<ROWS;r++) for (let c=0;c<COLS-W+1;c++) {
+    if ([0,1,2,3].every(i=>b[r][c+i]===playerChar)) mark([[r,c],[r,c+1],[r,c+2],[r,c+3]]);
+  }
+  // Vertical
+  for (let c=0;c<COLS;c++) for (let r=0;r<ROWS-W+1;r++) {
+    if ([0,1,2,3].every(i=>b[r+i][c]===playerChar)) mark([[r,c],[r+1,c],[r+2,c],[r+3,c]]);
+  }
+  // Diag montante
+  for (let r=0;r<ROWS-W+1;r++) for (let c=0;c<COLS-W+1;c++) {
+    if ([0,1,2,3].every(i=>b[r+i][c+i]===playerChar)) mark([[r,c],[r+1,c+1],[r+2,c+2],[r+3,c+3]]);
+  }
+  // Diag descendante
+  for (let r=W-1;r<ROWS;r++) for (let c=0;c<COLS-W+1;c++) {
+    if ([0,1,2,3].every(i=>b[r-i][c+i]===playerChar)) mark([[r,c],[r-1,c+1],[r-2,c+2],[r-3,c+3]]);
+  }
+}
+
+// ================================================================
+//  STATUTS
+// ================================================================
+function updateStatus() {
+  if (!state) return;
+
+  // Ply
+  document.getElementById('plyCounter').textContent = `Coup : ${state.ply} / 81`;
+
+  // Tour
+  const dot = document.getElementById('turnDot');
+  const txt = document.getElementById('turnText');
+
+  if (state.game_over) {
+    dot.className = 'turn-dot none';
+    if (state.winner === 0) {
+      txt.textContent = 'Match nul !';
+      scores[0]++;
+      setMessage('match nul', 'draw');
+    } else if (state.winner === RED) {
+      txt.textContent = 'Rouge gagne !';
+      scores[1]++;
+      setMessage('🔴 ROUGE GAGNE !', 'red-win');
+    } else {
+      txt.textContent = 'Jaune gagne !';
+      scores[2]++;
+      setMessage('🟡 JAUNE GAGNE !', 'yellow-win');
+    }
+    gameActive = false;
+  } else {
+    if (state.current_player === RED) {
+      dot.className = 'turn-dot red';
+      txt.textContent = currentMode === '0player' ? 'Tour de Rouge (IA)' :
+                        (currentMode === '2player' ? 'Tour de Rouge' :
+                         (humanColor === RED ? 'À vous (Rouge)' : 'Tour de l\'IA (Rouge)'));
+      setMessage(currentMode === '1player' && humanColor !== RED ? 'L\'IA réfléchit…' : 'Cliquez sur une colonne', 'info');
+    } else {
+      dot.className = 'turn-dot yellow';
+      txt.textContent = currentMode === '0player' ? 'Tour de Jaune (IA)' :
+                        (currentMode === '2player' ? 'Tour de Jaune' :
+                         (humanColor === YELLOW ? 'À vous (Jaune)' : 'Tour de l\'IA (Jaune)'));
+      setMessage(currentMode === '1player' && humanColor !== YELLOW ? 'L\'IA réfléchit…' : 'Cliquez sur une colonne', 'info');
+    }
+  }
+
+  document.getElementById('scoreRed').textContent = scores[1];
+  document.getElementById('scoreDraw').textContent = scores[0];
+  document.getElementById('scoreYellow').textContent = scores[2];
+}
+
+function setMessage(text, type) {
+  const box = document.getElementById('messageBox');
+  box.className = `message-box ${type}`;
+  box.textContent = text;
+}
+
+function setThinking(active) {
+  document.getElementById('thinkingIndicator').classList.toggle('active', active);
+}
+
+// ================================================================
+//  STATS DB
+// ================================================================
+async function loadStats() {
+  try {
+    const res = await fetch('/api/stats');
+    const data = await res.json();
+    document.getElementById('statGames').textContent = data.total_games.toLocaleString();
+    document.getElementById('statKB').textContent = data.kb_states.toLocaleString();
+  } catch(e) {
+    document.getElementById('statGames').textContent = 'N/A';
+    document.getElementById('statKB').textContent = 'N/A';
+  }
+}
+
+// ================================================================
+//  DÉMARRAGE
+// ================================================================
+buildBoard();
+onModeChange();
+loadStats();
+</script>
+</body>
+</html>
