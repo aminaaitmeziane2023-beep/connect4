@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Historique — Puissance 4</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0d0d1a;
+      color: #ccc;
+      font-family: 'Orbitron', sans-serif;
+      min-height: 100vh;
+      padding: 30px 20px;
+    }
+    .container { max-width: 900px; margin: 0 auto; }
+    h1 {
+      color: #3a7bff;
+      font-size: 1.4rem;
+      margin-bottom: 24px;
+      border-bottom: 1px solid #2a2a4a;
+      padding-bottom: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    a.back {
+      font-size: 0.75rem;
+      color: #3a7bff;
+      text-decoration: none;
+      border: 1px solid #3a7bff;
+      padding: 6px 14px;
+      border-radius: 6px;
+    }
+    a.back:hover { background: rgba(58,123,255,0.12); }
+
+    .stats-bar {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+    .stat-card {
+      background: #1a1a2e;
+      border: 1px solid #2a2a4a;
+      border-radius: 8px;
+      padding: 12px 20px;
+      text-align: center;
+      flex: 1;
+      min-width: 140px;
+    }
+    .stat-card .val { font-size: 1.6rem; color: #3a7bff; font-weight: 700; }
+    .stat-card .lbl { font-size: 0.6rem; color: #888; margin-top: 4px; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.68rem;
+    }
+    thead tr {
+      border-bottom: 2px solid #3a7bff;
+      color: #3a7bff;
+    }
+    th { padding: 10px 8px; text-align: left; }
+    td { padding: 9px 8px; border-bottom: 1px solid #1a1a2e; }
+    tr:hover td { background: rgba(58,123,255,0.05); }
+    .badge {
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 0.65rem;
+      font-weight: 700;
+    }
+    .badge-rouge { background: rgba(255,80,80,0.15); color: #ff5050; }
+    .badge-jaune { background: rgba(255,200,0,0.15); color: #ffc800; }
+    .badge-nul   { background: rgba(150,150,150,0.15); color: #aaa; }
+    .badge-cours { background: rgba(58,123,255,0.15); color: #3a7bff; }
+
+    .empty { text-align: center; color: #555; padding: 60px 0; font-size: 0.85rem; }
+    .footer { text-align: right; color: #444; font-size: 0.6rem; margin-top: 14px; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>
+    📋 HISTORIQUE DES PARTIES
+    <a class="back" href="/">← RETOUR AU JEU</a>
+  </h1>
+
+  <div class="stats-bar" id="statsBar">
+    <div class="stat-card"><div class="val" id="sTotal">—</div><div class="lbl">PARTIES TOTALES</div></div>
+    <div class="stat-card"><div class="val" id="sRouge">—</div><div class="lbl">VICTOIRES ROUGE</div></div>
+    <div class="stat-card"><div class="val" id="sJaune">—</div><div class="lbl">VICTOIRES JAUNE</div></div>
+    <div class="stat-card"><div class="val" id="sNul">—</div><div class="lbl">MATCHS NULS</div></div>
+  </div>
+
+  <div id="tableContainer">
+    <p class="empty">Chargement...</p>
+  </div>
+</div>
+
+<script>
+async function load() {
+  try {
+    const res = await fetch('/api/historique');
+    const data = await res.json();
+    const parties = data.parties || [];
+
+    // Stats
+    const rouge = parties.filter(p => p.winner === 1).length;
+    const jaune = parties.filter(p => p.winner === 2).length;
+    const nul   = parties.filter(p => p.winner === 0).length;
+    document.getElementById('sTotal').textContent = parties.length;
+    document.getElementById('sRouge').textContent = rouge;
+    document.getElementById('sJaune').textContent = jaune;
+    document.getElementById('sNul').textContent   = nul;
+
+    if (parties.length === 0) {
+      document.getElementById('tableContainer').innerHTML = '<p class="empty">Aucune partie enregistrée pour l\'instant.<br>Jouez une partie pour la voir apparaître ici !</p>';
+      return;
+    }
+
+    let html = `<table>
+      <thead><tr>
+        <th>#</th><th>DATE</th><th>MODE</th><th>IA ROUGE</th><th>IA JAUNE</th><th>RÉSULTAT</th>
+      </tr></thead><tbody>`;
+
+    for (const p of parties) {
+      let badge = '';
+      if (p.winner === 1)      badge = '<span class="badge badge-rouge">🔴 Rouge gagne</span>';
+      else if (p.winner === 2) badge = '<span class="badge badge-jaune">🟡 Jaune gagne</span>';
+      else if (p.winner === 0) badge = '<span class="badge badge-nul">⚪ Match nul</span>';
+      else                     badge = '<span class="badge badge-cours">⏳ En cours</span>';
+
+      html += `<tr>
+        <td style="color:#555">${p.id}</td>
+        <td style="color:#aaa">${p.date}</td>
+        <td>${p.mode}</td>
+        <td style="color:#ccc">${p.ai1}</td>
+        <td style="color:#ccc">${p.ai2}</td>
+        <td>${badge}</td>
+      </tr>`;
+    }
+    html += '</tbody></table>';
+    html += `<p class="footer">${parties.length} partie(s) affichée(s)</p>`;
+    document.getElementById('tableContainer').innerHTML = html;
+
+  } catch(e) {
+    document.getElementById('tableContainer').innerHTML = '<p class="empty" style="color:#f44">Erreur de chargement : ' + e.message + '</p>';
+  }
+}
+
+load();
+</script>
+</body>
+</html>

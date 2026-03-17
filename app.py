@@ -164,6 +164,11 @@ def stats():
     return jsonify({"total_games": count, "kb_states": kb_size})
 
 
+@app.route("/historique")
+def page_historique():
+    return render_template("historique.html")
+
+
 @app.route("/api/historique", methods=["GET"])
 def historique():
     """Retourne l'historique des parties jouées via l'application."""
@@ -181,12 +186,14 @@ def historique():
         parties = []
         for r in rows:
             gid, mode, ai1, ai2, depth, winner, created_at = r
-            if winner == 1:
+            if winner is None:
+                resultat = "⏳ En cours"
+            elif winner == 1:
                 resultat = "🔴 Rouge gagne"
             elif winner == 2:
                 resultat = "🟡 Jaune gagne"
-            elif winner == 0 and created_at:
-                resultat = "Match nul"
+            elif winner == 0:
+                resultat = "⚪ Match nul"
             else:
                 resultat = "En cours"
             parties.append({
@@ -195,6 +202,7 @@ def historique():
                 "ai1": ai1 or "-",
                 "ai2": ai2 or "-",
                 "depth": depth,
+                "winner": winner,
                 "resultat": resultat,
                 "date": created_at.strftime("%d/%m/%Y %H:%M") if created_at else "-"
             })
