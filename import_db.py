@@ -10,7 +10,7 @@ import psycopg2
 # 👇 REMPLACEZ PAR VOTRE EXTERNAL DATABASE URL RENDER
 #    (Dashboard Render → votre DB → Connections → External Database URL)
 # ---------------------------------------------------------------
-DATABASE_URL = "postgresql://USER:PASSWORD@HOST:PORT/DATABASE"
+DATABASE_URL = "postgresql://connect4_db_36wj_user:DS9ty4Wu0aW0269PBXOcTDCXNtyj9IXs@dpg-d6sr11ngi27c73da61j0-a.frankfurt-postgres.render.com/connect4_db_36wj"
 # ---------------------------------------------------------------
 
 print("Connexion à la base de données Render...")
