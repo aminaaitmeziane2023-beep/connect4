@@ -3,13 +3,27 @@
 
 import os
 import logging
-from flask import Flask, render_template, request, jsonify, session
+from flask import Flask, render_template, request, jsonify
 
 from game import Connect4, RED, YELLOW
 import minmax as minmax_ai
 import random_ai
 from ia import DatabaseAI, build_knowledge_base
 import db as database
+
+# État des parties en mémoire, indexé par tab_id
+# { tab_id: { board, mode, ai1, ai2, depth, human_color, game_id, history } }
+_games: dict = {}
+
+def get_game(tab_id: str) -> dict:
+    return _games.get(tab_id, {})
+
+def set_game(tab_id: str, data: dict):
+    _games[tab_id] = data
+
+def get_tab_id() -> str:
+    data = request.get_json(force=True, silent=True) or {}
+    return str(data.get("tab_id", "default"))
 
 # ------------------------------------------------------------------ #
 #  Configuration                                                        #
@@ -58,29 +72,27 @@ def index():
 def new_game():
     """Crée une nouvelle partie."""
     data = request.get_json(force=True)
-    mode = data.get("mode", "1player")          # "0player", "1player", "2player"
-    ai1  = data.get("ai1", "minmax")            # AI du joueur 1 (mode 0player)
-    ai2  = data.get("ai2", "minmax")            # AI du joueur 2
+    tab_id = str(data.get("tab_id", "default"))
+    mode = data.get("mode", "1player")
+    ai1  = data.get("ai1", "minmax")
+    ai2  = data.get("ai2", "minmax")
     depth = int(data.get("depth", 4))
-    human_color = int(data.get("human_color", RED))  # 1player: couleur humain
+    human_color = int(data.get("human_color", RED))
 
     game = Connect4()
-    session["board"] = game.board_to_str()
-    session["mode"] = mode
-    session["ai1"] = ai1        # IA pour RED en mode 0p / IA adverse en mode 1p
-    session["ai2"] = ai2
-    session["depth"] = depth
-    session["human_color"] = human_color
-    session["game_id"] = None
-    session["history"] = []
-
-    # Persister en DB
+    gid = None
     try:
         gid = database.create_game(mode, ai1, ai2, depth)
-        session["game_id"] = gid
         database.save_state(gid, 0, game.board_to_str())
     except Exception as e:
         logger.warning(f"DB save échoué: {e}")
+
+    set_game(tab_id, {
+        "board": game.board_to_str(),
+        "mode": mode, "ai1": ai1, "ai2": ai2,
+        "depth": depth, "human_color": human_color,
+        "game_id": gid, "history": []
+    })
 
     return jsonify({"ok": True, "state": game.to_dict()})
 
@@ -89,34 +101,33 @@ def new_game():
 def play():
     """Joue un coup humain."""
     data = request.get_json(force=True)
+    tab_id = str(data.get("tab_id", "default"))
     col = int(data.get("col", -1))
 
-    grid_str = session.get("board")
-    if not grid_str:
+    g = get_game(tab_id)
+    if not g:
         return jsonify({"error": "Pas de partie en cours"}), 400
 
-    game = Connect4.from_str(grid_str)
-    mode = session.get("mode", "1player")
+    game = Connect4.from_str(g["board"])
+    mode = g.get("mode", "1player")
 
     if game.game_over:
         return jsonify({"error": "Partie terminée"}), 400
 
-    # Vérifier que c'est bien au tour de l'humain
     if mode == "1player":
-        human_color = session.get("human_color", RED)
-        if game.current_player != human_color:
+        if game.current_player != g.get("human_color", RED):
             return jsonify({"error": "C'est le tour de l'IA"}), 400
 
-    # Sauvegarder état avant coup pour undo
-    history = session.get("history", [])
+    history = g.get("history", [])
     history.append(game.board_to_str())
-    session["history"] = history[-40:]  # garder max 40 coups
+    g["history"] = history[-40:]
 
     if not game.drop_piece(col):
         return jsonify({"error": "Coup invalide"}), 400
 
-    _persist_move(game, col)
-    session["board"] = game.board_to_str()
+    _persist_move(game, col, g)
+    g["board"] = game.board_to_str()
+    set_game(tab_id, g)
 
     return jsonify({"ok": True, "state": game.to_dict()})
 
@@ -165,14 +176,13 @@ def set_board():
         logger.warning(f"DB save échoué: {e}")
         gid = None
 
-    session["board"]       = game.board_to_str()
-    session["mode"]        = mode
-    session["ai1"]         = ai1
-    session["ai2"]         = ai2
-    session["depth"]       = depth
-    session["human_color"] = human_color
-    session["game_id"]     = gid
-    session["history"]     = []
+    data2  = request.get_json(force=True) or {}
+    tab_id = str(data2.get("tab_id", "default"))
+    set_game(tab_id, {
+        "board": game.board_to_str(), "mode": mode,
+        "ai1": ai1, "ai2": ai2, "depth": depth,
+        "human_color": human_color, "game_id": gid, "history": []
+    })
 
     turn_label = "Rouge" if game.current_player == RED else "Jaune"
     return jsonify({
@@ -191,22 +201,30 @@ def switch_player():
     which  = data.get("which", "ai2")   # "ai1" (rouge) ou "ai2" (jaune)
     new_type = data.get("type", "minmax")  # "human", "minmax", "ia", "random"
 
-    session[which] = new_type
+    data2  = request.get_json(force=True) or {}
+    tab_id = str(data2.get("tab_id", "default"))
+    g = get_game(tab_id)
+    if g:
+        g[which] = new_type
+        set_game(tab_id, g)
     return jsonify({"ok": True, "which": which, "type": new_type})
 
 @app.route("/api/hint", methods=["POST"])
 def hint():
     """Suggère la meilleure colonne pour le joueur humain."""
-    grid_str = session.get("board")
-    if not grid_str:
+    data   = request.get_json(force=True)
+    tab_id = str(data.get("tab_id", "default"))
+
+    g = get_game(tab_id)
+    if not g:
         return jsonify({"error": "Pas de partie"}), 400
 
-    game = Connect4.from_str(grid_str)
+    game = Connect4.from_str(g["board"])
     if game.game_over:
         return jsonify({"error": "Partie terminée"}), 400
 
-    depth = session.get("depth", 4)
-    best_col = minmax_ai.get_best_move(game, depth)
+    depth = g.get("depth", 4)
+    best_col   = minmax_ai.get_best_move(game, depth)
     all_scores = minmax_ai.get_all_scores(game, depth)
 
     return jsonify({
@@ -218,25 +236,27 @@ def hint():
 @app.route("/api/undo", methods=["POST"])
 def undo():
     """Annule le(s) dernier(s) coup(s) selon le mode."""
-    grid_str = session.get("board")
-    if not grid_str:
+    data   = request.get_json(force=True)
+    tab_id = str(data.get("tab_id", "default"))
+
+    g = get_game(tab_id)
+    if not g:
         return jsonify({"error": "Pas de partie"}), 400
 
-    history = session.get("history", [])
+    history = g.get("history", [])
     if not history:
         return jsonify({"error": "Rien à annuler"}), 400
 
-    mode = session.get("mode", "1player")
-
-    # En mode 1 joueur : annuler 2 coups (humain + IA) sauf si < 2 coups
+    mode = g.get("mode", "1player")
     nb_undo = 2 if mode == "1player" and len(history) >= 2 else 1
-
+    grid_str = g["board"]
     for _ in range(nb_undo):
         if history:
             grid_str = history.pop()
 
-    session["board"] = grid_str
-    session["history"] = history
+    g["board"]   = grid_str
+    g["history"] = history
+    set_game(tab_id, g)
 
     game = Connect4.from_str(grid_str)
     return jsonify({"ok": True, "state": game.to_dict()})
@@ -244,38 +264,38 @@ def undo():
 @app.route("/api/ai_move", methods=["POST"])
 def ai_move():
     """L'IA joue son coup."""
-    grid_str = session.get("board")
-    if not grid_str:
+    data = request.get_json(force=True)
+    tab_id = str(data.get("tab_id", "default"))
+
+    g = get_game(tab_id)
+    if not g:
         return jsonify({"error": "Pas de partie en cours"}), 400
 
-    game = Connect4.from_str(grid_str)
+    game = Connect4.from_str(g["board"])
     if game.game_over:
         return jsonify({"error": "Partie terminée"}), 400
 
-    mode = session.get("mode", "1player")
-    depth = session.get("depth", 4)
+    mode  = g.get("mode", "1player")
+    depth = g.get("depth", 4)
 
-    # Déterminer quel type d'IA joue
     if mode == "0player":
-        ai_type = session.get("ai1") if game.current_player == RED else session.get("ai2")
-    else:  # 1player
-        ai_type = session.get("ai2")  # ai2 = IA adverse
+        ai_type = g.get("ai1") if game.current_player == RED else g.get("ai2")
+    else:
+        ai_type = g.get("ai2")
 
-    # Calculer les scores de toutes les colonnes pour affichage
     col_scores = _compute_all_scores(game, ai_type, depth)
-
     col = _compute_ai_move(game, ai_type, depth)
     if col is None:
         return jsonify({"error": "Aucun coup disponible"}), 400
 
-    # Sauvegarder état avant coup pour undo
-    history = session.get("history", [])
+    history = g.get("history", [])
     history.append(game.board_to_str())
-    session["history"] = history[-40:]
+    g["history"] = history[-40:]
 
     game.drop_piece(col)
-    _persist_move(game, col)
-    session["board"] = game.board_to_str()
+    _persist_move(game, col, g)
+    g["board"] = game.board_to_str()
+    set_game(tab_id, g)
 
     return jsonify({"ok": True, "col": col, "state": game.to_dict(), "scores": col_scores})
 
@@ -283,10 +303,11 @@ def ai_move():
 @app.route("/api/state", methods=["GET"])
 def get_state():
     """Retourne l'état courant de la partie."""
-    grid_str = session.get("board")
-    if not grid_str:
+    tab_id = request.args.get("tab_id", "default")
+    g = get_game(tab_id)
+    if not g:
         return jsonify({"error": "Pas de partie"}), 400
-    game = Connect4.from_str(grid_str)
+    game = Connect4.from_str(g["board"])
     return jsonify(game.to_dict())
 
 
@@ -415,22 +436,11 @@ def _compute_ai_move(game: Connect4, ai_type: str, depth: int) -> int | None:
         return minmax_ai.get_best_move(game, depth)
 
 
-def _persist_move(game: Connect4, col: int):
-    # Sauvegarder l'historique des boards pour undo
-    # On sauvegarde AVANT le coup (donc le board courant avant drop)
-    # En pratique on sauvegarde après le drop, donc on garde l'état précédent
-    history = session.get("history", [])
-    # L'état avant ce coup = on reconstruit depuis l'historique
-    # On ne peut pas revenir en arrière sur le board actuel (coup déjà joué)
-    # Donc on stocke l'état AVANT chaque coup dans la route play/ai_move
-    gid = session.get("game_id")
+def _persist_move(game: Connect4, col: int, g: dict = None):
+    gid = g.get("game_id") if g else None
     if not gid:
         return
     try:
-        player = YELLOW if game.current_player != game.current_player else RED  # joueur qui vient de jouer
-        # current_player a déjà changé après drop_piece si pas game_over
-        played_by = YELLOW if game.current_player == RED and not game.game_over else RED
-        # plus simple : déduire depuis ply (impair = rouge, pair = jaune)
         played_by = RED if game.ply % 2 == 1 else YELLOW
         database.save_move(gid, played_by, col, game.ply)
         database.save_state(gid, game.ply, game.board_to_str())

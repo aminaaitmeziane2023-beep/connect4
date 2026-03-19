@@ -678,6 +678,13 @@ let gameActive = false;
 let isAiTurn = false;
 let isPaused = false;
 
+// Identifiant unique par onglet (persiste dans sessionStorage)
+const TAB_ID = (() => {
+  let id = sessionStorage.getItem('tab_id');
+  if (!id) { id = 'tab_' + Math.random().toString(36).slice(2,10) + '_' + Date.now(); sessionStorage.setItem('tab_id', id); }
+  return id;
+})();
+
 // ================================================================
 //  INITIALISATION DU DOM
 // ================================================================
@@ -768,7 +775,7 @@ async function startGame() {
   const res = await fetch('/api/new_game', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
-    body: JSON.stringify(body)
+    body: JSON.stringify({...body, tab_id: TAB_ID})
   });
   const data = await res.json();
   if (data.ok) {
@@ -803,7 +810,7 @@ async function humanPlay(col) {
   const res = await fetch('/api/play', {
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({col})
+    body: JSON.stringify({tab_id: TAB_ID, col})
   });
   const data = await res.json();
   if (data.ok) {
@@ -960,7 +967,7 @@ async function launchFromPaint(mode, humanColorVal) {
   const res = await fetch('/api/set_board', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({
+    body: JSON.stringify({tab_id: TAB_ID, 
       grid_str: flat,
       mode: mode,
       ai1: 'minmax',
@@ -1043,7 +1050,7 @@ async function switchPlayer(color) {
   const res = await fetch('/api/switch_player', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ which, type: newType })
+    body: JSON.stringify({tab_id: TAB_ID,  which, type: newType })
   });
   const data = await res.json();
   if (data.ok) {
@@ -1077,7 +1084,7 @@ async function getHint() {
   btn.disabled = true;
 
   try {
-    const res  = await fetch('/api/hint', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
+    const res  = await fetch('/api/hint', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({tab_id: TAB_ID}) });
     const data = await res.json();
     if (data.ok) {
       hintCol = data.hint_col;
@@ -1135,7 +1142,7 @@ function updateControlBtns() {
 
 async function undoMove() {
   if (!gameActive || isPaused) return;
-  const res = await fetch('/api/undo', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
+  const res = await fetch('/api/undo', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({tab_id: TAB_ID}) });
   const data = await res.json();
   if (data.ok) {
     state = data.state;
@@ -1223,7 +1230,7 @@ async function triggerAiMove() {
   const res = await fetch('/api/ai_move', {
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body: '{}'
+    body: JSON.stringify({tab_id: TAB_ID})
   });
   const data = await res.json();
   setThinking(false);
