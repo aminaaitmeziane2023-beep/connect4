@@ -10,6 +10,7 @@ import minmax as minmax_ai
 import random_ai
 from ia import DatabaseAI, build_knowledge_base
 import db as database
+from opening_book import get_opening_move
 
 # État des parties en mémoire, indexé par tab_id
 # { tab_id: { board, mode, ai1, ai2, depth, human_color, game_id, history } }
@@ -135,6 +136,85 @@ def play():
 
 
 
+
+
+@app.route("/api/predict", methods=["POST"])
+def predict():
+    """Prédit l'issue de la partie avec MinMax profond."""
+    data   = request.get_json(force=True)
+    tab_id = str(data.get("tab_id", "default"))
+
+    g = get_game(tab_id)
+    if not g:
+        return jsonify({"error": "Pas de partie"}), 400
+
+    game = Connect4.from_str(g["board"])
+    if game.game_over:
+        return jsonify({"error": "Partie terminée"}), 400
+
+    # Recherche profonde pour prédire
+    import math
+    player = game.current_player
+    result = _deep_predict(game, player, depth=8)
+
+    return jsonify({"ok": True, **result})
+
+
+def _deep_predict(game: Connect4, ai_player: int, depth: int = 8) -> dict:
+    """Analyse profonde : prédit gagnant et nombre de coups."""
+    import math
+    from minmax import minimax, evaluate_board
+
+    opp = YELLOW if ai_player == RED else RED
+    player_name = "Rouge" if ai_player == RED else "Jaune"
+    opp_name    = "Jaune" if ai_player == RED else "Rouge"
+
+    # MinMax profond pour trouver le score
+    _, score = minimax(game, depth, -math.inf, math.inf, True, ai_player)
+
+    if score >= 9_000_000:
+        # Victoire forcée — estimer dans combien de coups
+        turns = max(1, (10_000_000 - score))
+        turns = min(turns, game.get_valid_columns().__len__() * 2)
+        return {
+            "prediction": f"🔴 {player_name} gagne dans environ {max(1,turns)} coup(s) !",
+            "winner": ai_player,
+            "turns": max(1, turns),
+            "confidence": "haute"
+        }
+    elif score <= -9_000_000:
+        turns = max(1, (10_000_000 + score))
+        turns = min(turns, 20)
+        return {
+            "prediction": f"🟡 {opp_name} gagne dans environ {max(1,turns)} coup(s) !",
+            "winner": opp,
+            "turns": max(1, turns),
+            "confidence": "haute"
+        }
+    elif score > 20:
+        return {
+            "prediction": f"📈 {player_name} est en avantage",
+            "winner": None,
+            "turns": None,
+            "confidence": "moyenne",
+            "score": score
+        }
+    elif score < -20:
+        return {
+            "prediction": f"📉 {opp_name} est en avantage",
+            "winner": None,
+            "turns": None,
+            "confidence": "moyenne",
+            "score": score
+        }
+    else:
+        return {
+            "prediction": "⚖️ Position équilibrée",
+            "winner": None,
+            "turns": None,
+            "confidence": "basse",
+            "score": score
+        }
 
 @app.route("/api/set_board", methods=["POST"])
 def set_board():
@@ -311,6 +391,97 @@ def get_state():
     return jsonify(game.to_dict())
 
 
+
+@app.route("/api/abandon", methods=["POST"])
+def abandon():
+    """Abandonne la partie et génère une raison via analyse."""
+    data   = request.get_json(force=True)
+    tab_id = str(data.get("tab_id", "default"))
+
+    g = get_game(tab_id)
+    if not g:
+        return jsonify({"error": "Pas de partie"}), 400
+
+    game = Connect4.from_str(g["board"])
+
+    # Analyser la position pour donner une raison
+    import math
+    from minmax import minimax, evaluate_board
+
+    player      = game.current_player
+    opp         = YELLOW if player == RED else RED
+    player_name = "Rouge" if player == RED else "Jaune"
+    opp_name    = "Jaune" if player == RED else "Rouge"
+
+    _, score = minimax(game, 6, -math.inf, math.inf, True, player)
+
+    if score <= -9_000_000:
+        raison = f"Position perdue — {opp_name} avait une séquence gagnante forcée."
+    elif score < -50:
+        raison = f"Désavantage matériel important — {opp_name} contrôlait mieux le centre."
+    elif score < -10:
+        raison = f"Légère infériorité positionelle — difficile de renverser la situation."
+    else:
+        raison = f"Position encore jouable — abandon prématuré !"
+
+    # Terminer la partie en DB
+    gid = g.get("game_id")
+    if gid:
+        try:
+            database.finish_game(gid, opp)
+        except Exception:
+            pass
+
+    _games.pop(tab_id, None)
+
+    return jsonify({
+        "ok": True,
+        "raison": raison,
+        "score": score,
+        "gagnant": opp_name
+    })
+
+
+@app.route("/api/elo", methods=["GET"])
+def get_elo():
+    """Retourne les stats Elo des IA."""
+    try:
+        conn = database.get_connection()
+        cur  = conn.cursor()
+        # Calculer Elo simple depuis les parties app_games
+        cur.execute("""
+            SELECT ai2_type,
+                   COUNT(*) as total,
+                   SUM(CASE WHEN winner = 1 THEN 1 ELSE 0 END) as rouge_wins,
+                   SUM(CASE WHEN winner = 2 THEN 1 ELSE 0 END) as jaune_wins,
+                   SUM(CASE WHEN winner = 0 THEN 1 ELSE 0 END) as draws
+            FROM app_games
+            WHERE mode = '1player' AND winner IS NOT NULL
+            GROUP BY ai2_type
+        """)
+        rows = cur.fetchall()
+        cur.close()
+
+        stats = []
+        for ai_type, total, rw, jw, draws in rows:
+            if not total: continue
+            win_rate = rw / total if total else 0
+            # Elo approximatif basé sur win rate humain
+            human_wr = jw / total if total else 0.5
+            elo = round(1500 + 400 * (human_wr - 0.5))
+            stats.append({
+                "ia": ai_type or "minmax",
+                "total": total,
+                "rouge_wins": rw,
+                "jaune_wins": jw,
+                "draws": draws,
+                "human_win_rate": round(human_wr * 100, 1),
+                "elo_estimate": elo
+            })
+        return jsonify({"ok": True, "stats": stats})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)})
+
 @app.route("/api/stats", methods=["GET"])
 def stats():
     """Statistiques globales."""
@@ -427,7 +598,13 @@ def _compute_all_scores(game: Connect4, ai_type: str, depth: int) -> dict:
 def _compute_ai_move(game: Connect4, ai_type: str, depth: int) -> int | None:
     if ai_type == "random":
         return random_ai.get_best_move(game)
-    elif ai_type == "ia":
+
+    # Bibliothèque d'ouverture pour les premiers coups (instantané)
+    opening = get_opening_move(game)
+    if opening is not None:
+        return opening
+
+    if ai_type == "ia":
         ai = get_db_ai()
         if ai:
             return ai.get_best_move(game)

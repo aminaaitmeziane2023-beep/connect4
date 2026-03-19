@@ -347,17 +347,30 @@
 
   /* AI thinking */
   .thinking-indicator {
-    text-align: center;
-    font-size: 0.75rem;
-    color: var(--accent);
-    letter-spacing: 0.2em;
-    height: 22px;
-    margin-top: 8px;
-    animation: blink 0.8s step-end infinite;
     display: none;
+    margin-top: 8px;
+    font-size: 0.65rem;
+    color: var(--accent);
+    letter-spacing: 0.1em;
+    font-family: var(--font-head);
+    text-align: center;
   }
   .thinking-indicator.active { display: block; }
-  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .think-bar-wrap {
+    width: 100%;
+    height: 4px;
+    background: #1a1a2e;
+    border-radius: 2px;
+    margin-top: 4px;
+    overflow: hidden;
+  }
+  .think-bar {
+    height: 100%;
+    width: 0%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.1s linear;
+  }
 
   /* Responsive */
   @media (max-width: 700px) {
@@ -504,7 +517,41 @@
   .switch-btn.human-active { border-color: #00e676; color: #00e676; }
   .switch-btn.ai-active    { border-color: #3a7bff; color: #3a7bff; }
 
-  </style>
+  
+  .predict-box {
+    display: none;
+    margin-top: 8px;
+    padding: 10px 14px;
+    background: rgba(156,39,176,0.1);
+    border: 1px solid rgba(156,39,176,0.4);
+    border-radius: 8px;
+    font-family: var(--font-head);
+    font-size: 0.68rem;
+    text-align: center;
+    color: #e1bee7;
+    animation: fadeIn 0.3s ease;
+  }
+  .predict-box.visible { display: block; }
+  .predict-main { font-size: 0.9rem; font-weight: 700; margin-bottom: 4px; }
+  .predict-conf { font-size: 0.58rem; color: #888; }
+  @keyframes fadeIn { from { opacity:0; transform: translateY(-4px); } to { opacity:1; transform:none; } }
+
+  .abandon-modal {
+    display: none; position: fixed; top:0; left:0; width:100%; height:100%;
+    background: rgba(0,0,0,0.85); z-index: 2000;
+    justify-content: center; align-items: center;
+  }
+  .abandon-modal.visible { display: flex; }
+  .abandon-box {
+    background: #1a1a2e; border: 1px solid #f44336; border-radius: 12px;
+    padding: 28px; max-width: 420px; width: 90%; text-align: center;
+    font-family: var(--font-head);
+  }
+  .abandon-box h3 { color: #f44336; margin-bottom: 14px; font-size: 1rem; }
+  .abandon-raison { color: #ccc; font-size: 0.72rem; line-height: 1.6; margin-bottom: 16px; }
+  .abandon-winner { font-size: 1rem; font-weight: 700; margin-bottom: 20px; }
+  .abandon-btns { display: flex; gap: 10px; justify-content: center; }
+</style>
 </head>
 <body>
 
@@ -584,8 +631,10 @@
       <button class="ctrl-btn" id="btnUndo"    onclick="undoMove()"   disabled title="Annuler le dernier coup">↩ UNDO</button>
       <button class="ctrl-btn" id="btnPause"   onclick="togglePause()" disabled>⏸ PAUSE</button>
       <button class="ctrl-btn danger" id="btnRestart" onclick="restartGame()" disabled title="Rejouer même config">↺ RESTART</button>
+      <button class="ctrl-btn danger" id="btnAbandon" onclick="abandonGame()" disabled title="Abandonner la partie">🏳 ABANDON</button>
       <button class="ctrl-btn" id="btnHint" onclick="getHint()" disabled title="Meilleur coup suggéré">💡 HINT</button>
       <button class="ctrl-btn" id="btnPaint" onclick="togglePaint()" title="Peindre une position de départ">🎨 PAINT</button>
+      <button class="ctrl-btn" id="btnPredict" onclick="getPredict()" disabled title="Analyser la position">🔮 PRÉDIRE</button>
     </div>
   </div>
 
@@ -602,6 +651,12 @@
     <!-- Résultat analyse -->
     <div class="analyse-result" id="analyseResult"></div>
 
+    <!-- Prédiction -->
+    <div class="predict-box" id="predictBox">
+      <div class="predict-main" id="predictMain">—</div>
+      <div class="predict-conf" id="predictConf"></div>
+    </div>
+
     <!-- Switch joueur en pleine partie -->
     <div class="switch-panel" id="switchPanel">
       <span style="font-size:0.58rem;color:#666;font-family:var(--font-head);">CONTRÔLE :</span>
@@ -617,7 +672,10 @@
     <div class="board" id="board">
       <!-- Cellules générées en JS -->
     </div>
-    <div class="thinking-indicator" id="thinkingIndicator">⚡ IA EN TRAIN DE CALCULER…</div>
+    <div class="thinking-indicator" id="thinkingIndicator">
+        <span id="thinkLabel">⚡ IA CALCULE…</span>
+        <div class="think-bar-wrap"><div class="think-bar" id="thinkBar"></div></div>
+      </div>
   </div>
 
   <!-- ===== STATUTS ===== -->
@@ -803,9 +861,12 @@ async function humanPlay(col) {
   if (!gameActive || !state || state.game_over) return;
   if (isAiTurn) return;
   if (currentMode === '0player') return;
-
   if (currentMode === '1player' && state.current_player !== humanColor) return;
   if (!state.valid_columns.includes(col)) return;
+
+  // ── Affichage immédiat du coup humain ──────────────────────────
+  renderCellImmediate(col, state.current_player);
+  disableColButtons();  // empêcher double-clic
 
   const res = await fetch('/api/play', {
     method:'POST',
@@ -815,13 +876,36 @@ async function humanPlay(col) {
   const data = await res.json();
   if (data.ok) {
     state = data.state;
-    renderBoard();
+    renderBoard();       // sync définitif avec serveur
     updateStatus();
     updateControlBtns();
     updateSwitchPanel();
     if (!state.game_over && shouldAiPlayNext()) {
-      setTimeout(triggerAiMove, 400);
+      setTimeout(triggerAiMove, 200);  // délai réduit, coup déjà affiché
     }
+  }
+}
+
+function renderCellImmediate(col, player) {
+  // Trouver la rangée la plus basse disponible dans cette colonne
+  for (let r = 0; r < ROWS; r++) {
+    const idx = r * COLS + col;
+    if (state.grid_str[idx] === '.') {
+      const cell = document.getElementById(`cell-${r}-${col}`);
+      if (cell) {
+        cell.className = 'cell ' + (player === RED ? 'red' : 'yellow');
+        cell.style.transform = 'scale(1.1)';
+        setTimeout(() => { cell.style.transform = ''; }, 150);
+      }
+      return;
+    }
+  }
+}
+
+function disableColButtons() {
+  for (let c = 0; c < COLS; c++) {
+    const btn = document.getElementById(`colbtn-${c}`);
+    if (btn) btn.disabled = true;
   }
 }
 
@@ -1070,6 +1154,74 @@ async function switchPlayer(color) {
   }
 }
 
+
+
+// ================================================================
+//  ABANDON
+// ================================================================
+async function abandonGame() {
+  if (!gameActive || !state || state.game_over) return;
+  const modal = document.getElementById('abandonModal');
+  document.getElementById('abandonRaison').textContent = 'Analyse de la position…';
+  document.getElementById('abandonWinner').textContent = '';
+  modal.classList.add('visible');
+
+  try {
+    const res  = await fetch('/api/abandon', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({tab_id: TAB_ID})
+    });
+    const data = await res.json();
+    if (data.ok) {
+      document.getElementById('abandonRaison').textContent = data.raison;
+      document.getElementById('abandonWinner').innerHTML =
+        `🏆 Victoire <span style="color:${data.gagnant==='Jaune'?'#fdd835':'#e53935'}">${data.gagnant}</span>`;
+      gameActive = false;
+      state = null;
+      updateControlBtns();
+    }
+  } catch(e) {
+    document.getElementById('abandonRaison').textContent = 'Erreur lors de l'analyse.';
+  }
+}
+
+function closeAbandon() {
+  document.getElementById('abandonModal').classList.remove('visible');
+}
+
+// ================================================================
+//  PRÉDICTION
+// ================================================================
+async function getPredict() {
+  const btn = document.getElementById('btnPredict');
+  const box = document.getElementById('predictBox');
+  btn.disabled = true;
+  btn.textContent = '🔮 …';
+  box.classList.remove('visible');
+
+  try {
+    const res  = await fetch('/api/predict', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({tab_id: TAB_ID})
+    });
+    const data = await res.json();
+    if (data.ok) {
+      document.getElementById('predictMain').textContent = data.prediction;
+      const conf = data.confidence === 'haute' ? '🎯 Confiance élevée'
+                 : data.confidence === 'moyenne' ? '📊 Confiance moyenne'
+                 : '🤔 Position complexe';
+      document.getElementById('predictConf').textContent = conf;
+      box.classList.add('visible');
+      setTimeout(() => box.classList.remove('visible'), 6000);
+    }
+  } catch(e) {}
+
+  btn.textContent = '🔮 PRÉDIRE';
+  btn.disabled = !gameActive || !state || state?.game_over;
+}
+
 // ================================================================
 //  HINT
 // ================================================================
@@ -1136,7 +1288,9 @@ function updateControlBtns() {
   document.getElementById('btnUndo').disabled    = !hasHistory || isPaused;
   document.getElementById('btnPause').disabled   = !notOver;
   document.getElementById('btnRestart').disabled = !hasGame;
+  document.getElementById('btnAbandon').disabled = !notOver;
   document.getElementById('btnHint').disabled = !notOver || currentMode !== '1player' || isAiTurn || paintMode;
+  document.getElementById('btnPredict').disabled = !notOver || paintMode;
   document.getElementById('btnPaint').classList.toggle('pause-active', paintMode);
 }
 
@@ -1225,7 +1379,8 @@ function clearWeights() {
 async function triggerAiMove() {
   if (!gameActive || !state || state.game_over || isPaused) return;
   isAiTurn = true;
-  setThinking(true);
+  const _depth = parseInt(document.getElementById('depthRange')?.value || document.getElementById('depthRange0')?.value || 4);
+  setThinking(true, _depth);
 
   const res = await fetch('/api/ai_move', {
     method:'POST',
@@ -1389,8 +1544,48 @@ function setMessage(text, type) {
   box.textContent = text;
 }
 
-function setThinking(active) {
-  document.getElementById('thinkingIndicator').classList.toggle('active', active);
+let _thinkTimer = null;
+let _thinkStart = 0;
+
+function setThinking(active, depth) {
+  const indicator = document.getElementById('thinkingIndicator');
+  const bar       = document.getElementById('thinkBar');
+  const label     = document.getElementById('thinkLabel');
+
+  if (active) {
+    indicator.classList.add('active');
+    _thinkStart = Date.now();
+    bar.style.width = '0%';
+    bar.style.transition = 'none';
+
+    // Estimer la durée selon la profondeur (calibré empiriquement)
+    const estimated = depth ? Math.min(200 + depth * depth * 80, 4000) : 1500;
+    label.textContent = '⚡ IA CALCULE…';
+
+    // Animer la barre jusqu'à 90% sur la durée estimée
+    requestAnimationFrame(() => {
+      bar.style.transition = `width ${estimated}ms cubic-bezier(0.4,0,0.6,1)`;
+      bar.style.width = '90%';
+    });
+
+    // Clignoter le label
+    _thinkTimer = setInterval(() => {
+      const elapsed = ((Date.now() - _thinkStart) / 1000).toFixed(1);
+      label.textContent = `⚡ IA CALCULE… ${elapsed}s`;
+    }, 100);
+
+  } else {
+    // Compléter la barre instantanément à 100%
+    bar.style.transition = 'width 0.1s ease-out';
+    bar.style.width = '100%';
+    if (_thinkTimer) { clearInterval(_thinkTimer); _thinkTimer = null; }
+    label.textContent = '✓ Coup joué';
+    setTimeout(() => {
+      indicator.classList.remove('active');
+      bar.style.transition = 'none';
+      bar.style.width = '0%';
+    }, 300);
+  }
 }
 
 // ================================================================
