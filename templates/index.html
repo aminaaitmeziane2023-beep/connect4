@@ -256,6 +256,8 @@
     align-items: center;
     flex: 1;
     min-width: 0;
+    align-self: flex-start;
+    padding-top: 0;
   }
 
   /* Column click indicators */
@@ -263,8 +265,8 @@
     display: grid;
     grid-template-columns: repeat(9, 1fr);
     gap: 4px;
-    margin-bottom: 6px;
-    width: 100%;
+    margin-bottom: 4px;
+    width: clamp(270px, 40vw, 460px);
   }
   .col-btn {
     height: 28px;
@@ -298,13 +300,13 @@
     box-shadow:
       0 0 40px rgba(58,123,255,0.08),
       inset 0 0 20px rgba(0,0,0,0.4);
-    width: clamp(280px, 44vw, 500px);
-    height: clamp(280px, 44vw, 500px);
+    width: clamp(270px, 40vw, 460px);
+    height: clamp(270px, 40vw, 460px);
   }
 
   .cell {
-    width: clamp(30px, 4.2vw, 52px);
-    height: clamp(30px, 4.2vw, 52px);
+    width: clamp(28px, 3.8vw, 46px);
+    height: clamp(28px, 3.8vw, 46px);
     border-radius: 50%;
     background: var(--empty);
     border: 1px solid var(--grid-line);
@@ -398,7 +400,8 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 3px;
+    gap: 2px;
+    min-width: 0;
   }
   .col-weight {
     font-size: 0.52rem;
