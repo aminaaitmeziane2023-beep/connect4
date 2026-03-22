@@ -71,12 +71,13 @@
   /* ===== LAYOUT ===== */
   .main-layout {
     display: flex;
-    gap: 22px;
+    gap: 12px;
     align-items: flex-start;
     flex-wrap: wrap;
     justify-content: center;
     width: 100%;
-    max-width: 1100px;
+    max-width: 1300px;
+    padding: 0 10px;
   }
 
   /* ===== PANELS ===== */
@@ -98,7 +99,7 @@
   }
 
   /* ===== CONTROLS ===== */
-  .controls { min-width: 220px; max-width: 320px; flex-shrink: 0; }
+  .controls { min-width: 200px; max-width: 280px; flex-shrink: 0; }
 
   .control-group { margin-bottom: 16px; }
   .control-group label {
@@ -181,7 +182,7 @@
   .btn-start:active { transform: translateY(0); }
 
   /* ===== STATUS ===== */
-  .status-panel { min-width: 200px; max-width: 260px; flex-shrink: 0; }
+  .status-panel { min-width: 180px; max-width: 220px; flex-shrink: 0; }
 
   .turn-indicator {
     display: flex;
@@ -289,21 +290,21 @@
     display: grid;
     grid-template-columns: repeat(9, 1fr);
     grid-template-rows: repeat(9, 1fr);
-    gap: 5px;
-    padding: 12px;
+    gap: 4px;
+    padding: 8px;
     background: #0a1428;
     border: 2px solid var(--grid-line);
     border-radius: 10px;
     box-shadow:
       0 0 40px rgba(58,123,255,0.08),
       inset 0 0 20px rgba(0,0,0,0.4);
-    width: clamp(300px, 55vw, 560px);
-    height: clamp(300px, 55vw, 560px);
+    width: clamp(280px, 44vw, 500px);
+    height: clamp(280px, 44vw, 500px);
   }
 
   .cell {
-    width: clamp(36px, 5.5vw, 58px);
-    height: clamp(36px, 5.5vw, 58px);
+    width: clamp(30px, 4.2vw, 52px);
+    height: clamp(30px, 4.2vw, 52px);
     border-radius: 50%;
     background: var(--empty);
     border: 1px solid var(--grid-line);
