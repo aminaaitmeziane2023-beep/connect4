@@ -18,7 +18,15 @@ def get_conn():
     url = DATABASE_URL
     if url.startswith("postgres://"):
         url = url.replace("postgres://", "postgresql://", 1)
-    conn = psycopg2.connect(url, sslmode="require")
+    conn = psycopg2.connect(
+        url,
+        sslmode="require",
+        keepalives=1,
+        keepalives_idle=30,
+        keepalives_interval=10,
+        keepalives_count=5,
+        connect_timeout=30
+    )
     conn.autocommit = False
     return conn
 
@@ -154,6 +162,15 @@ def main():
         for _ in range(min(args.batch, to_generate - total_inserted)):
             mode = random.choice(modes)
             batch.append(play_game(mode))
+
+        # Reconnexion automatique si la connexion est tombée
+        try:
+            conn.cursor().execute("SELECT 1")
+        except Exception:
+            print("\n  Reconnexion...")
+            try: conn.close()
+            except: pass
+            conn = get_conn()
 
         inserted = insert_batch(conn, batch)
         total_inserted += inserted
