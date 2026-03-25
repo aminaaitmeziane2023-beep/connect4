@@ -3,57 +3,57 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Historique — Puissance 4</title>
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+  <title>Historique ♡ Puissance 4 Kawaii</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #0d0d1a; color: #ccc; font-family: 'Orbitron', sans-serif; min-height: 100vh; padding: 30px 20px; }
+    body { background: #fff0f5; color: #7a3055; font-family: 'Nunito', sans-serif; min-height: 100vh; padding: 30px 20px; }
     .container { max-width: 960px; margin: 0 auto; }
 
-    h1 { color: #3a7bff; font-size: 1.3rem; margin-bottom: 22px; border-bottom: 1px solid #2a2a4a; padding-bottom: 14px; display: flex; justify-content: space-between; align-items: center; }
-    a.back { font-size: 0.7rem; color: #3a7bff; text-decoration: none; border: 1px solid #3a7bff; padding: 6px 14px; border-radius: 6px; }
-    a.back:hover { background: rgba(58,123,255,0.12); }
+    h1 { color: #d63384; font-size: 1.3rem; font-weight: 900; margin-bottom: 22px; border-bottom: 2px dashed #ffb3d1; padding-bottom: 14px; display: flex; justify-content: space-between; align-items: center; }
+    a.back { font-size: 0.7rem; font-weight: 700; color: #d63384; text-decoration: none; border: 2px solid #ffb3d1; padding: 6px 16px; border-radius: 14px; background: #fff; }
+    a.back:hover { background: rgba(214,51,132,0.08); border-color: #d63384; }
 
     .stats-bar { display: flex; gap: 12px; margin-bottom: 22px; flex-wrap: wrap; }
-    .stat-card { background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 8px; padding: 12px 18px; text-align: center; flex: 1; min-width: 120px; }
-    .stat-card .val { font-size: 1.5rem; color: #3a7bff; font-weight: 700; }
-    .stat-card .lbl { font-size: 0.58rem; color: #888; margin-top: 4px; }
+    .stat-card { background: #fff; border: 2px solid #ffb3d1; border-radius: 16px; padding: 12px 18px; text-align: center; flex: 1; min-width: 120px; box-shadow: 0 2px 10px rgba(255,68,153,0.08); }
+    .stat-card .val { font-size: 1.5rem; color: #d63384; font-weight: 900; }
+    .stat-card .lbl { font-size: 0.58rem; font-weight: 700; color: #c47a9a; margin-top: 4px; }
 
     .filters { display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; align-items: center; }
-    .filter-btn { background: #1a1a2e; border: 1px solid #2a2a4a; color: #aaa; padding: 7px 16px; border-radius: 6px; cursor: pointer; font-family: 'Orbitron', sans-serif; font-size: 0.65rem; }
-    .filter-btn.active { border-color: #3a7bff; color: #3a7bff; background: rgba(58,123,255,0.1); }
-    .filter-btn:hover { border-color: #3a7bff; color: #3a7bff; }
+    .filter-btn { background: #fff; border: 2px solid #ffb3d1; color: #c47a9a; padding: 7px 16px; border-radius: 14px; cursor: pointer; font-family: 'Nunito', sans-serif; font-size: 0.7rem; font-weight: 700; }
+    .filter-btn.active { border-color: #d63384; color: #d63384; background: rgba(214,51,132,0.07); }
+    .filter-btn:hover { border-color: #d63384; color: #d63384; }
 
-    table { width: 100%; border-collapse: collapse; font-size: 0.65rem; }
-    thead tr { border-bottom: 2px solid #3a7bff; color: #3a7bff; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.68rem; font-weight: 700; }
+    thead tr { border-bottom: 2px solid #ffb3d1; color: #d63384; }
     th { padding: 10px 8px; text-align: left; }
-    td { padding: 8px 8px; border-bottom: 1px solid #151525; }
-    tr:hover td { background: rgba(58,123,255,0.04); }
+    td { padding: 8px 8px; border-bottom: 1px dashed #ffe0ee; color: #7a3055; }
+    tr:hover td { background: rgba(255,68,153,0.04); }
 
-    .badge { padding: 3px 8px; border-radius: 4px; font-size: 0.62rem; font-weight: 700; }
-    .badge-rouge { background: rgba(255,80,80,0.15); color: #ff5050; }
-    .badge-jaune { background: rgba(255,200,0,0.15); color: #ffc800; }
-    .badge-nul   { background: rgba(150,150,150,0.15); color: #aaa; }
-    .badge-cours { background: rgba(58,123,255,0.15); color: #3a7bff; }
+    .badge { padding: 3px 10px; border-radius: 10px; font-size: 0.62rem; font-weight: 700; }
+    .badge-rouge { background: rgba(255,68,153,0.12); color: #cc0066; }
+    .badge-jaune { background: rgba(255,215,0,0.18); color: #b38600; }
+    .badge-nul   { background: rgba(200,150,180,0.15); color: #c47a9a; }
+    .badge-cours { background: rgba(214,51,132,0.1); color: #d63384; }
 
-    .src-tag { font-size: 0.55rem; padding: 2px 6px; border-radius: 3px; }
-    .src-app  { background: rgba(58,123,255,0.15); color: #3a7bff; }
-    .src-hist { background: rgba(120,80,255,0.15); color: #a07bff; }
+    .src-tag { font-size: 0.58rem; padding: 3px 8px; border-radius: 8px; font-weight: 700; }
+    .src-app  { background: rgba(255,68,153,0.1); color: #d63384; }
+    .src-hist { background: rgba(180,100,200,0.12); color: #9b3cb7; }
 
     .pagination { display: flex; gap: 8px; margin-top: 18px; justify-content: center; align-items: center; }
-    .page-btn { background: #1a1a2e; border: 1px solid #2a2a4a; color: #aaa; padding: 7px 14px; border-radius: 6px; cursor: pointer; font-family: 'Orbitron', sans-serif; font-size: 0.62rem; }
-    .page-btn:hover, .page-btn.active { border-color: #3a7bff; color: #3a7bff; }
+    .page-btn { background: #fff; border: 2px solid #ffb3d1; color: #c47a9a; padding: 7px 16px; border-radius: 14px; cursor: pointer; font-family: 'Nunito', sans-serif; font-size: 0.65rem; font-weight: 700; }
+    .page-btn:hover, .page-btn.active { border-color: #d63384; color: #d63384; }
     .page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-    .page-info { font-size: 0.62rem; color: #666; }
+    .page-info { font-size: 0.65rem; font-weight: 700; color: #c47a9a; }
 
-    .empty { text-align: center; color: #555; padding: 60px 0; font-size: 0.8rem; }
-    .loading { text-align: center; color: #3a7bff; padding: 40px 0; font-size: 0.75rem; }
+    .empty { text-align: center; color: #c47a9a; padding: 60px 0; font-size: 0.85rem; font-weight: 700; }
+    .loading { text-align: center; color: #d63384; padding: 40px 0; font-size: 0.8rem; font-weight: 700; }
   </style>
 </head>
 <body>
 <div class="container">
   <h1>
-    📋 HISTORIQUE DES PARTIES
+    ♡ Historique des parties
     <a class="back" href="/">← RETOUR AU JEU</a>
   </h1>
 
