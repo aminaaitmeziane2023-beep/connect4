@@ -494,6 +494,22 @@
     font-family: var(--font-head); font-size: 0.62rem; font-weight: 700;
   }
   .paint-analyse:hover { background: #d63384; }
+  .paint-option-btn {
+    background: #fff; border: 2px solid #ffb3d1; color: #c47a9a;
+    padding: 6px 14px; border-radius: 12px; cursor: pointer;
+    font-family: var(--font-head); font-size: 0.62rem; font-weight: 700;
+    transition: all 0.15s;
+  }
+  .paint-option-btn:hover { border-color: #d63384; color: #d63384; }
+  .paint-option-btn.selected { border-color: #d63384; color: #fff; background: #d63384; }
+  .predict-box {
+    background: rgba(214,51,132,0.08); border: 1px solid #ffb3d1;
+    border-radius: 10px; padding: 8px 14px; margin: 8px 0;
+    font-size: 0.75rem; color: #d63384; font-weight: 700;
+  }
+  .paint-section-label {
+    margin: 8px 0 4px; color: #c47a9a; font-size: 0.58rem; letter-spacing: 0.05em;
+  }
   .analyse-result {
     display: none;
     margin-top: 8px;
@@ -936,10 +952,14 @@ function disableColButtons() {
 //  MODE PEINTURE
 // ================================================================
 let paintMode    = false;
-let paintColor   = 'R';   // 'R', 'J', '.'
+let paintColor   = 'R';   // couleur du pinceau : 'R', 'J', '.'
 let paintBoard   = Array(9).fill(null).map(() => Array(9).fill('.'));
 let aiRedType    = 'minmax';
 let aiYellowType = 'human';
+// Options panneau analyse/lancement
+let paintSelectedMode  = '1player';
+let paintSelectedAI    = 'minmax';
+let paintSelectedColor = 1;  // 1=rouge, 2=jaune
 
 function togglePaint() {
   paintMode = !paintMode;
@@ -1031,67 +1051,133 @@ function clearPaint() {
 
 async function analyseBoard() {
   const flat = paintBoard.flat().join('');
-  const r = flat.split('R').length - 1;
-  const j = flat.split('J').length - 1;
+  const r = (flat.match(/R/g)||[]).length;
+  const j = (flat.match(/J/g)||[]).length;
   const diff = r - j;
-
   const result = document.getElementById('analyseResult');
 
+  if (flat.replace(/\./g,'').length === 0) {
+    result.innerHTML = `<div style="color:#f44;font-size:0.75rem;">⚠ Grille vide — dessine une position d'abord !</div>`;
+    result.classList.add('visible');
+    return;
+  }
   if (diff < -1 || diff > 1) {
-    result.innerHTML = `<div class="turn-label" style="color:#f44;">⚠ Position invalide</div>
-      <div>${r} rouges, ${j} jaunes — différence maximale autorisée : 1</div>`;
+    result.innerHTML = `<div style="color:#f44;font-size:0.75rem;">⚠ Position invalide : ${r} rouges, ${j} jaunes<br><span style="font-size:0.6rem;color:#aaa;">Différence max autorisée : 1</span></div>`;
     result.classList.add('visible');
     return;
   }
 
-  const turnPlayer  = (r === j) ? 'Rouge' : 'Jaune';
-  const turnClass   = (r === j) ? 'turn-rouge' : 'turn-jaune';
-  const turnEmoji   = (r === j) ? '🔴' : '🟡';
+  const turnPlayer = (r === j) ? 'Rouge' : 'Jaune';
+  const turnEmoji  = (r === j) ? '🔴' : '🟡';
+  const turnColor  = (r === j) ? 1 : 2;
+  paintSelectedColor = turnColor;
 
-  // Afficher l'analyse
+  result.innerHTML = `<div style="color:#d63384;font-size:0.75rem;">⏳ Analyse en cours...</div>`;
+  result.classList.add('visible');
+
+  let predictHtml = '';
+  try {
+    const resBoard = await fetch('/api/set_board', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({tab_id: TAB_ID, grid_str: flat, mode: '1player',
+        ai1: 'minmax', ai2: 'minmax', depth: 4, human_color: 1})
+    });
+    const boardData = await resBoard.json();
+    if (boardData.ok) {
+      const resPred = await fetch('/api/predict', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({tab_id: TAB_ID})
+      });
+      const pred = await resPred.json();
+      if (pred.ok) {
+        predictHtml = `<div class="predict-box">${pred.prediction}</div>`;
+      }
+    }
+  } catch(e) { predictHtml = ''; }
+
   result.innerHTML = `
-    <div class="turn-label ${turnClass}">${turnEmoji} C'est à ${turnPlayer} de jouer</div>
-    <div style="margin-bottom:8px;color:#888;">${r} pièces rouges · ${j} pièces jaunes</div>
-    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
-      <button class="paint-analyse" onclick="launchFromPaint('1player', ${(r===j)?1:2})">▶ Jouer comme ${turnPlayer} (1 joueur)</button>
-      <button class="paint-analyse" style="background:#3a7bff;" onclick="launchFromPaint('2player', 1)">▶ 2 Joueurs</button>
-      <button class="paint-analyse" style="background:#9c27b0;" onclick="launchFromPaint('0player', 1)">▶ IA vs IA</button>
-    </div>`;
+    <div class="turn-label ${(r===j)?'turn-rouge':'turn-jaune'}">${turnEmoji} Tour de ${turnPlayer} · ${r}🔴 ${j}🟡</div>
+    ${predictHtml}
+    <div class="paint-section-label">MODE DE JEU</div>
+    <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-bottom:6px;">
+      <button class="paint-option-btn ${paintSelectedMode==='1player'?'selected':''}" id="pmode-1player" onclick="setPaintMode('1player')">🧑 1 Joueur</button>
+      <button class="paint-option-btn ${paintSelectedMode==='2player'?'selected':''}" id="pmode-2player" onclick="setPaintMode('2player')">👥 2 Joueurs</button>
+      <button class="paint-option-btn ${paintSelectedMode==='0player'?'selected':''}" id="pmode-0player" onclick="setPaintMode('0player')">🤖 IA vs IA</button>
+    </div>
+    <div id="paintOnePlayerOptions" style="display:${paintSelectedMode==='1player'?'block':'none'}">
+      <div class="paint-section-label">JE JOUE AVEC</div>
+      <div style="display:flex;gap:6px;justify-content:center;margin-bottom:6px;">
+        <button class="paint-option-btn ${paintSelectedColor===1?'selected':''}" id="pcol-1" onclick="setPaintPlayerColor(1)">🔴 Rouge</button>
+        <button class="paint-option-btn ${paintSelectedColor===2?'selected':''}" id="pcol-2" onclick="setPaintPlayerColor(2)">🟡 Jaune</button>
+      </div>
+      <div class="paint-section-label">TYPE D'IA</div>
+      <div style="display:flex;gap:6px;justify-content:center;margin-bottom:6px;">
+        <button class="paint-option-btn ${paintSelectedAI==='minmax'?'selected':''}" id="pai-minmax" onclick="setPaintAI('minmax')">🔢 MinMax</button>
+        <button class="paint-option-btn ${paintSelectedAI==='ia'?'selected':''}" id="pai-ia" onclick="setPaintAI('ia')">🧠 IA DB</button>
+      </div>
+    </div>
+    <button class="paint-analyse" style="font-size:0.75rem;padding:10px 28px;margin-top:6px;" onclick="launchFromPaint()">▶ JOUER !</button>
+  `;
   result.classList.add('visible');
 }
 
-async function launchFromPaint(mode, humanColorVal) {
+function setPaintMode(mode) {
+  paintSelectedMode = mode;
+  ['1player','2player','0player'].forEach(m => {
+    const b = document.getElementById('pmode-'+m);
+    if (b) b.classList.toggle('selected', m === mode);
+  });
+  const opts = document.getElementById('paintOnePlayerOptions');
+  if (opts) opts.style.display = (mode === '1player') ? 'block' : 'none';
+}
+
+function setPaintPlayerColor(color) {
+  paintSelectedColor = color;
+  [1,2].forEach(c => {
+    const b = document.getElementById('pcol-'+c);
+    if (b) b.classList.toggle('selected', c === color);
+  });
+}
+
+function setPaintAI(ai) {
+  paintSelectedAI = ai;
+  ['minmax','ia'].forEach(a => {
+    const b = document.getElementById('pai-'+a);
+    if (b) b.classList.toggle('selected', a === ai);
+  });
+}
+
+async function launchFromPaint() {
   const flat = paintBoard.flat().join('');
-  const ai2Val = document.getElementById('ai2Select') ? document.getElementById('ai2Select').value : 'minmax';
   const depthVal = document.getElementById('depthRange') ? parseInt(document.getElementById('depthRange').value) : 4;
 
   const res = await fetch('/api/set_board', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({tab_id: TAB_ID, 
+    body: JSON.stringify({tab_id: TAB_ID,
       grid_str: flat,
-      mode: mode,
+      mode: paintSelectedMode,
       ai1: 'minmax',
-      ai2: ai2Val,
+      ai2: paintSelectedAI,
       depth: depthVal,
-      human_color: humanColorVal
+      human_color: paintSelectedColor
     })
   });
   const data = await res.json();
   if (data.ok) {
     state = data.state;
-    humanColor = humanColorVal;
-    currentMode = mode;
+    humanColor = paintSelectedColor;
+    currentMode = paintSelectedMode;
     gameActive = true;
     paintMode = false;
 
-    // Quitter le mode paint
     document.getElementById('btnPaint').textContent = '🎨 PAINT';
     document.getElementById('btnPaint').classList.remove('pause-active');
     document.getElementById('paintToolbar').classList.remove('visible');
     document.getElementById('analyseResult').classList.remove('visible');
 
-    // Rebind clicks normaux
     for (let c = 0; c < COLS; c++) {
       const btn = document.getElementById(`colbtn-${c}`);
       if (btn) btn.onclick = () => humanPlay(c);
@@ -1109,7 +1195,8 @@ async function launchFromPaint(mode, humanColorVal) {
 
     if (shouldAiPlayNext()) setTimeout(triggerAiMove, 500);
   } else {
-    alert(data.error || 'Erreur lors du chargement de la position');
+    const result = document.getElementById('analyseResult');
+    result.innerHTML += `<div style="color:#f44;margin-top:6px;">⚠ ${data.error || 'Erreur de chargement'}</div>`;
   }
 }
 
@@ -1226,14 +1313,22 @@ async function getPredict() {
     const data = await res.json();
     if (data.ok) {
       document.getElementById('predictMain').textContent = data.prediction;
-      const conf = data.confidence === 'haute' ? '🎯 Confiance élevée'
-                 : data.confidence === 'moyenne' ? '📊 Confiance moyenne'
-                 : '🤔 Position complexe';
+      const conf = data.confidence === 'haute'   ? '🎯 Analyse sûre (victoire forcée détectée)'
+                 : data.confidence === 'moyenne' ? '📊 Avantage positionnel estimé'
+                 : '🤔 Position équilibrée, difficile à trancher';
       document.getElementById('predictConf').textContent = conf;
       box.classList.add('visible');
-      setTimeout(() => box.classList.remove('visible'), 6000);
+      // Reste affiché jusqu'au prochain coup (pas de disparition automatique)
+    } else {
+      document.getElementById('predictMain').textContent = '⚠ Impossible d'analyser cette position';
+      document.getElementById('predictConf').textContent = '';
+      box.classList.add('visible');
     }
-  } catch(e) {}
+  } catch(e) {
+    document.getElementById('predictMain').textContent = '⚠ Erreur de connexion';
+    document.getElementById('predictConf').textContent = '';
+    box.classList.add('visible');
+  }
 
   btn.textContent = '🔮 PRÉDIRE';
   btn.disabled = !gameActive || !state || state?.game_over;
@@ -1443,6 +1538,9 @@ function shouldAiPlayNext() {
 // ================================================================
 function renderBoard() {
   if (!state) return;
+  // Masquer la prédiction dès que le plateau change
+  const box = document.getElementById('predictBox');
+  if (box) box.classList.remove('visible');
   const gridStr = state.grid_str; // row 0=bas
 
   // grid_str[i] : row = i//9, col = i%9

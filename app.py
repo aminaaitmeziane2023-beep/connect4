@@ -169,51 +169,48 @@ def _deep_predict(game: Connect4, ai_player: int, depth: int = 8) -> dict:
     player_name = "Rouge" if ai_player == RED else "Jaune"
     opp_name    = "Jaune" if ai_player == RED else "Rouge"
 
-    # MinMax profond pour trouver le score
     _, score = minimax(game, depth, -math.inf, math.inf, True, ai_player)
 
+    # Score minmax encode : victoire = 10_000_000 + depth_restant
+    # Coups jusqu'à la fin = depth_initial - depth_restant
+
     if score >= 9_000_000:
-        # Victoire forcée — estimer dans combien de coups
-        turns = max(1, (10_000_000 - score))
-        turns = min(turns, game.get_valid_columns().__len__() * 2)
+        remaining = score - 10_000_000
+        turns = max(1, depth - remaining)
+        turns = min(turns, 81 - game.ply)
         return {
-            "prediction": f"🔴 {player_name} gagne dans environ {max(1,turns)} coup(s) !",
+            "prediction": f"🔴 {player_name} gagne en ~{turns} coup(s) !",
             "winner": ai_player,
-            "turns": max(1, turns),
+            "turns": turns,
             "confidence": "haute"
         }
     elif score <= -9_000_000:
-        turns = max(1, (10_000_000 + score))
-        turns = min(turns, 20)
+        remaining = (-score) - 10_000_000
+        turns = max(1, depth - remaining)
+        turns = min(turns, 81 - game.ply)
         return {
-            "prediction": f"🟡 {opp_name} gagne dans environ {max(1,turns)} coup(s) !",
+            "prediction": f"🟡 {opp_name} gagne en ~{turns} coup(s) !",
             "winner": opp,
-            "turns": max(1, turns),
+            "turns": turns,
             "confidence": "haute"
         }
-    elif score > 20:
+    elif score > 50:
         return {
             "prediction": f"📈 {player_name} est en avantage",
-            "winner": None,
-            "turns": None,
-            "confidence": "moyenne",
-            "score": score
+            "winner": None, "turns": None,
+            "confidence": "moyenne", "score": score
         }
-    elif score < -20:
+    elif score < -50:
         return {
             "prediction": f"📉 {opp_name} est en avantage",
-            "winner": None,
-            "turns": None,
-            "confidence": "moyenne",
-            "score": score
+            "winner": None, "turns": None,
+            "confidence": "moyenne", "score": score
         }
     else:
         return {
-            "prediction": "⚖️ Position équilibrée",
-            "winner": None,
-            "turns": None,
-            "confidence": "basse",
-            "score": score
+            "prediction": "⚖️ Position équilibrée — tout reste ouvert",
+            "winner": None, "turns": None,
+            "confidence": "basse", "score": score
         }
 
 @app.route("/api/set_board", methods=["POST"])
@@ -576,7 +573,7 @@ def _format_party(gid, mode, ai1, ai2, winner, created_at, source):
 # ------------------------------------------------------------------ #
 
 def _compute_all_scores(game: Connect4, ai_type: str, depth: int) -> dict:
-    """Retourne les scores de toutes les colonnes pour affichage (normalisés 0-100)."""
+    """Retourne les scores de toutes les colonnes pour affichage."""
     try:
         if ai_type == "random":
             return {}
@@ -588,57 +585,21 @@ def _compute_all_scores(game: Connect4, ai_type: str, depth: int) -> dict:
                 raw = minmax_ai.get_all_scores(game, depth)
         else:
             raw = minmax_ai.get_all_scores(game, depth)
-
-        if not raw:
-            return {}
-
-        # Normaliser 0-100 pour l'affichage (scores minmax bruts = ±10^9)
-        vals = list(raw.values())
-        min_v = min(vals)
-        max_v = max(vals)
-        if max_v - min_v > 0:
-            return {
-                str(k): round((v - min_v) / (max_v - min_v) * 100)
-                for k, v in raw.items()
-            }
-        else:
-            return {str(k): 50 for k in raw}
-
+        # Normaliser pour l'affichage : convertir en str keys pour JSON
+        return {str(k): v for k, v in raw.items()}
     except Exception as e:
         logger.warning(f"Erreur scores: {e}")
         return {}
 
 
 def _compute_ai_move(game: Connect4, ai_type: str, depth: int) -> int | None:
-    valid = game.get_valid_columns()
-    if not valid:
-        return None
-
-    # ── PRIORITÉ 1 : coup gagnant immédiat (toujours, avant tout) ─
-    for col in valid:
-        g2 = game.copy()
-        g2.drop_piece(col)
-        if g2.game_over and g2.winner == game.current_player:
-            return col
-
-    # ── PRIORITÉ 2 : bloquer victoire adverse immédiate ───────────
-    opp = YELLOW if game.current_player == RED else RED
-    for col in valid:
-        g2 = game.copy()
-        g2.current_player = opp
-        g2.drop_piece(col)
-        if g2.game_over and g2.winner == opp:
-            return col
-
     if ai_type == "random":
         return random_ai.get_best_move(game)
 
-    # Opening book uniquement pour le tout 1er coup (ply 0 = centre)
-    # Au-delà, MinMax gère seul pour détecter toutes les menaces
-    if game.ply == 0:
-        opening = get_opening_move(game)
-        if opening is not None:
-            return opening
+    # Bibliothèque d'ouverture pour les premiers coups (instantané)
+    opening = get_opening_move(game)
+    if opening is not None:
+        return opening
 
     if ai_type == "ia":
         ai = get_db_ai()
