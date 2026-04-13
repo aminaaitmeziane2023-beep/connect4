@@ -155,7 +155,7 @@ def predict():
     # Recherche profonde pour prédire
     import math
     player = game.current_player
-    result = _deep_predict(game, player, depth=8)
+    result = _deep_predict(game, player, depth=5)
 
     return jsonify({"ok": True, **result})
 

@@ -1281,34 +1281,34 @@ function closeAbandon() {
 async function getPredict() {
   const btn = document.getElementById('btnPredict');
   const box = document.getElementById('predictBox');
+  const main = document.getElementById('predictMain');
+  const conf = document.getElementById('predictConf');
+
   btn.disabled = true;
   btn.textContent = '🔮 …';
-  box.classList.remove('visible');
+  main.textContent = '⏳ Analyse en cours...';
+  conf.textContent = 'MinMax profondeur 5 — quelques secondes';
+  box.classList.add('visible');
 
   try {
-    const res  = await fetch('/api/predict', {
+    const res = await fetch('/api/predict', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({tab_id: TAB_ID})
     });
     const data = await res.json();
     if (data.ok) {
-      document.getElementById('predictMain').textContent = data.prediction;
-      const conf = data.confidence === 'haute'   ? '🎯 Analyse sûre (victoire forcée détectée)'
-                 : data.confidence === 'moyenne' ? '📊 Avantage positionnel estimé'
-                 : '🤔 Position équilibrée, difficile à trancher';
-      document.getElementById('predictConf').textContent = conf;
-      box.classList.add('visible');
-      // Reste affiché jusqu'au prochain coup (pas de disparition automatique)
+      main.textContent = data.prediction;
+      conf.textContent = data.confidence === 'haute'   ? '🎯 Victoire forcée détectée'
+                       : data.confidence === 'moyenne' ? '📊 Avantage positionnel estimé'
+                       : '🤔 Position équilibrée';
     } else {
-      document.getElementById('predictMain').textContent = "⚠ Impossible d'analyser cette position";
-      document.getElementById('predictConf').textContent = '';
-      box.classList.add('visible');
+      main.textContent = "⚠ Impossible d'analyser";
+      conf.textContent = '';
     }
   } catch(e) {
-    document.getElementById('predictMain').textContent = '⚠ Erreur de connexion';
-    document.getElementById('predictConf').textContent = '';
-    box.classList.add('visible');
+    main.textContent = '⚠ Erreur de connexion';
+    conf.textContent = '';
   }
 
   btn.textContent = '🔮 PRÉDIRE';
