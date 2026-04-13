@@ -614,15 +614,14 @@ def _compute_ai_move(game: Connect4, ai_type: str, depth: int) -> int | None:
     if not valid:
         return None
 
-    # ── PRIORITÉ ABSOLUE 1 : coup gagnant immédiat ────────────────
-    # (avant opening book, avant tout)
+    # ── PRIORITÉ 1 : coup gagnant immédiat (toujours, avant tout) ─
     for col in valid:
         g2 = game.copy()
         g2.drop_piece(col)
         if g2.game_over and g2.winner == game.current_player:
             return col
 
-    # ── PRIORITÉ ABSOLUE 2 : bloquer victoire adverse immédiate ───
+    # ── PRIORITÉ 2 : bloquer victoire adverse immédiate ───────────
     opp = YELLOW if game.current_player == RED else RED
     for col in valid:
         g2 = game.copy()
@@ -634,10 +633,12 @@ def _compute_ai_move(game: Connect4, ai_type: str, depth: int) -> int | None:
     if ai_type == "random":
         return random_ai.get_best_move(game)
 
-    # Bibliothèque d'ouverture pour les premiers coups (instantané)
-    opening = get_opening_move(game)
-    if opening is not None:
-        return opening
+    # Opening book uniquement pour le tout 1er coup (ply 0 = centre)
+    # Au-delà, MinMax gère seul pour détecter toutes les menaces
+    if game.ply == 0:
+        opening = get_opening_move(game)
+        if opening is not None:
+            return opening
 
     if ai_type == "ia":
         ai = get_db_ai()
