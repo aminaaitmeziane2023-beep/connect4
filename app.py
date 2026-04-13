@@ -169,10 +169,8 @@ def _deep_predict(game: Connect4, ai_player: int, depth: int = 8) -> dict:
     player_name = "Rouge" if ai_player == RED else "Jaune"
     opp_name    = "Jaune" if ai_player == RED else "Rouge"
 
+    # MinMax profond pour trouver le score
     _, score = minimax(game, depth, -math.inf, math.inf, True, ai_player)
-
-    # Score minmax encode : victoire = 10_000_000 + depth_restant
-    # Coups jusqu'à la fin = depth_initial - depth_restant
 
     if score >= 9_000_000:
         remaining = score - 10_000_000
@@ -573,7 +571,7 @@ def _format_party(gid, mode, ai1, ai2, winner, created_at, source):
 # ------------------------------------------------------------------ #
 
 def _compute_all_scores(game: Connect4, ai_type: str, depth: int) -> dict:
-    """Retourne les scores de toutes les colonnes pour affichage."""
+    """Retourne les scores normalisés 0-100 pour affichage."""
     try:
         if ai_type == "random":
             return {}
@@ -585,21 +583,50 @@ def _compute_all_scores(game: Connect4, ai_type: str, depth: int) -> dict:
                 raw = minmax_ai.get_all_scores(game, depth)
         else:
             raw = minmax_ai.get_all_scores(game, depth)
-        # Normaliser pour l'affichage : convertir en str keys pour JSON
-        return {str(k): v for k, v in raw.items()}
+
+        if not raw:
+            return {}
+
+        vals = list(raw.values())
+        min_v, max_v = min(vals), max(vals)
+        if max_v - min_v > 0:
+            return {str(k): round((v - min_v) / (max_v - min_v) * 100) for k, v in raw.items()}
+        else:
+            return {str(k): 50 for k in raw}
     except Exception as e:
         logger.warning(f"Erreur scores: {e}")
         return {}
 
 
 def _compute_ai_move(game: Connect4, ai_type: str, depth: int) -> int | None:
+    valid = game.get_valid_columns()
+    if not valid:
+        return None
+
+    # PRIORITÉ 1 : coup gagnant immédiat (avant tout)
+    for col in valid:
+        g2 = game.copy()
+        g2.drop_piece(col)
+        if g2.game_over and g2.winner == game.current_player:
+            return col
+
+    # PRIORITÉ 2 : bloquer victoire adverse immédiate
+    opp = YELLOW if game.current_player == RED else RED
+    for col in valid:
+        g2 = game.copy()
+        g2.current_player = opp
+        g2.drop_piece(col)
+        if g2.game_over and g2.winner == opp:
+            return col
+
     if ai_type == "random":
         return random_ai.get_best_move(game)
 
-    # Bibliothèque d'ouverture pour les premiers coups (instantané)
-    opening = get_opening_move(game)
-    if opening is not None:
-        return opening
+    # Opening book uniquement pour ply 0 (premier coup = centre)
+    if game.ply == 0:
+        opening = get_opening_move(game)
+        if opening is not None:
+            return opening
 
     if ai_type == "ia":
         ai = get_db_ai()

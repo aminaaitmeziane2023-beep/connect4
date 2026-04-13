@@ -21,7 +21,7 @@ def _score_window(window, player):
     elif p_count == 3 and e_count == 1:
         score += 50
     elif p_count == 2 and e_count == 2:
-        score += 4
+        score += 2
     if o_count == 3 and e_count == 1:
         score -= 80   # menace adverse à 3 pions : pénalité forte
     if o_count == 2 and e_count == 2:
