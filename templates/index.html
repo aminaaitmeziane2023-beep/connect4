@@ -1053,19 +1053,19 @@ function clearPaint() {
   document.getElementById('analyseResult').classList.remove('visible');
 }
 
-async function analyseBoard() {
+function analyseBoard() {
   const flat = paintBoard.flat().join('');
   const r = (flat.match(/R/g)||[]).length;
   const j = (flat.match(/J/g)||[]).length;
   const result = document.getElementById('analyseResult');
 
-  if (flat.replace(/[RJ]/g,'').length === flat.length) {
-    result.innerHTML = '<div style="color:#e53935;font-weight:700;">Grille vide — dessine une position !</div>';
+  if (r + j === 0) {
+    result.innerHTML = '<div style="color:#e53935;font-weight:700;font-size:0.75rem;">⚠ Grille vide — dessine une position !</div>';
     result.classList.add('visible');
     return;
   }
   if (Math.abs(r - j) > 1) {
-    result.innerHTML = '<div style="color:#e53935;font-weight:700;">Position invalide : ' + r + ' rouges, ' + j + ' jaunes</div>';
+    result.innerHTML = '<div style="color:#e53935;font-weight:700;font-size:0.75rem;">⚠ Position invalide : ' + r + ' rouges vs ' + j + ' jaunes (différence max : 1)</div>';
     result.classList.add('visible');
     return;
   }
@@ -1074,68 +1074,34 @@ async function analyseBoard() {
   const turnEmoji  = (r === j) ? '🔴' : '🟡';
   paintSelectedColor = (r === j) ? 1 : 2;
 
-  function buildPanel(predictLine) {
-    let html = '';
-    html += '<div class="turn-label ' + ((r===j) ? 'turn-rouge' : 'turn-jaune') + '">';
-    html += turnEmoji + ' Tour de ' + turnPlayer + ' &nbsp;·&nbsp; ' + r + ' 🔴 &nbsp; ' + j + ' 🟡</div>';
+  let html = '';
+  html += '<div class="turn-label ' + ((r===j)?'turn-rouge':'turn-jaune') + '">';
+  html += turnEmoji + ' Tour de ' + turnPlayer + ' &nbsp;·&nbsp; ' + r + ' 🔴 &nbsp; ' + j + ' 🟡</div>';
 
-    if (predictLine) {
-      html += '<div class="predict-box" style="margin:6px 0;">' + predictLine + '</div>';
-    } else {
-      html += '<div style="font-size:0.6rem;color:#c47a9a;margin:4px 0 8px;">🔮 Prédiction en cours...</div>';
-    }
+  html += '<div class="paint-section-label">MODE DE JEU</div>';
+  html += '<div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-bottom:6px;">';
+  html += '<button class="paint-option-btn' + (paintSelectedMode==='1player'?' selected':'') + '" id="pmode-1player" onclick="setPaintMode(\'1player\')">🧑 1 Joueur</button>';
+  html += '<button class="paint-option-btn' + (paintSelectedMode==='2player'?' selected':'') + '" id="pmode-2player" onclick="setPaintMode(\'2player\')">👥 2 Joueurs</button>';
+  html += '<button class="paint-option-btn' + (paintSelectedMode==='0player'?' selected':'') + '" id="pmode-0player" onclick="setPaintMode(\'0player\')">🤖 IA vs IA</button>';
+  html += '</div>';
 
-    html += '<div class="paint-section-label">MODE DE JEU</div>';
-    html += '<div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-bottom:6px;">';
-    html += '<button class="paint-option-btn' + (paintSelectedMode==='1player' ? ' selected' : '') + '" id="pmode-1player" onclick="setPaintMode(\'1player\')">🧑 1 Joueur</button>';
-    html += '<button class="paint-option-btn' + (paintSelectedMode==='2player' ? ' selected' : '') + '" id="pmode-2player" onclick="setPaintMode(\'2player\')">👥 2 Joueurs</button>';
-    html += '<button class="paint-option-btn' + (paintSelectedMode==='0player' ? ' selected' : '') + '" id="pmode-0player" onclick="setPaintMode(\'0player\')">🤖 IA vs IA</button>';
-    html += '</div>';
+  html += '<div id="paintOnePlayerOptions" style="display:' + (paintSelectedMode==='1player'?'block':'none') + '">';
+  html += '<div class="paint-section-label">JE JOUE AVEC</div>';
+  html += '<div style="display:flex;gap:6px;justify-content:center;margin-bottom:6px;">';
+  html += '<button class="paint-option-btn' + (paintSelectedColor===1?' selected':'') + '" id="pcol-1" onclick="setPaintPlayerColor(1)">🔴 Rouge</button>';
+  html += '<button class="paint-option-btn' + (paintSelectedColor===2?' selected':'') + '" id="pcol-2" onclick="setPaintPlayerColor(2)">🟡 Jaune</button>';
+  html += '</div>';
+  html += '<div class="paint-section-label">TYPE D\'IA</div>';
+  html += '<div style="display:flex;gap:6px;justify-content:center;margin-bottom:6px;">';
+  html += '<button class="paint-option-btn' + (paintSelectedAI==='minmax'?' selected':'') + '" id="pai-minmax" onclick="setPaintAI(\'minmax\')">🔢 MinMax</button>';
+  html += '<button class="paint-option-btn' + (paintSelectedAI==='ia'?' selected':'') + '" id="pai-ia" onclick="setPaintAI(\'ia\')">🧠 IA DB</button>';
+  html += '</div>';
+  html += '</div>';
 
-    const show1p = (paintSelectedMode === '1player') ? 'block' : 'none';
-    html += '<div id="paintOnePlayerOptions" style="display:' + show1p + '">';
-    html += '<div class="paint-section-label">JE JOUE AVEC</div>';
-    html += '<div style="display:flex;gap:6px;justify-content:center;margin-bottom:6px;">';
-    html += '<button class="paint-option-btn' + (paintSelectedColor===1 ? ' selected' : '') + '" id="pcol-1" onclick="setPaintPlayerColor(1)">🔴 Rouge</button>';
-    html += '<button class="paint-option-btn' + (paintSelectedColor===2 ? ' selected' : '') + '" id="pcol-2" onclick="setPaintPlayerColor(2)">🟡 Jaune</button>';
-    html += '</div>';
-    html += '<div class="paint-section-label">TYPE D\'IA</div>';
-    html += '<div style="display:flex;gap:6px;justify-content:center;margin-bottom:6px;">';
-    html += '<button class="paint-option-btn' + (paintSelectedAI==='minmax' ? ' selected' : '') + '" id="pai-minmax" onclick="setPaintAI(\'minmax\')">🔢 MinMax</button>';
-    html += '<button class="paint-option-btn' + (paintSelectedAI==='ia' ? ' selected' : '') + '" id="pai-ia" onclick="setPaintAI(\'ia\')">🧠 IA DB</button>';
-    html += '</div>';
-    html += '</div>';
+  html += '<button class="paint-analyse" style="font-size:0.75rem;padding:10px 28px;margin-top:6px;" onclick="launchFromPaint()">▶ JOUER !</button>';
 
-    html += '<button class="paint-analyse" style="font-size:0.75rem;padding:10px 28px;margin-top:6px;" onclick="launchFromPaint()">▶ JOUER !</button>';
-    return html;
-  }
-
-  // Affichage immédiat du panneau
-  result.innerHTML = buildPanel(null);
+  result.innerHTML = html;
   result.classList.add('visible');
-
-  // Prédiction en arrière-plan (rapide, profondeur 4)
-  try {
-    const resBoard = await fetch('/api/set_board', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({tab_id: TAB_ID, grid_str: flat, mode: '1player',
-        ai1: 'minmax', ai2: 'minmax', depth: 4, human_color: 1})
-    });
-    const bd = await resBoard.json();
-    if (bd.ok) {
-      const resPred = await fetch('/api/predict', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({tab_id: TAB_ID})
-      });
-      const pred = await resPred.json();
-      if (pred.ok) {
-        result.innerHTML = buildPanel(pred.prediction);
-        result.classList.add('visible');
-      }
-    }
-  } catch(e) { /* prédiction optionnelle */ }
 }
 
 function setPaintMode(mode) {
