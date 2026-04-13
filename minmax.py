@@ -23,9 +23,9 @@ def _score_window(window, player):
     elif p_count == 2 and e_count == 2:
         score += 2
     if o_count == 3 and e_count == 1:
-        score -= 8
+        score -= 80   # était -8 : trop faible, l'IA ignorait les menaces à 3 pions
     if o_count == 2 and e_count == 2:
-        score -= 1
+        score -= 3
     return score
 
 

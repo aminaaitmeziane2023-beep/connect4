@@ -576,7 +576,7 @@ def _format_party(gid, mode, ai1, ai2, winner, created_at, source):
 # ------------------------------------------------------------------ #
 
 def _compute_all_scores(game: Connect4, ai_type: str, depth: int) -> dict:
-    """Retourne les scores de toutes les colonnes pour affichage."""
+    """Retourne les scores de toutes les colonnes pour affichage (normalisés 0-100)."""
     try:
         if ai_type == "random":
             return {}
@@ -588,14 +588,49 @@ def _compute_all_scores(game: Connect4, ai_type: str, depth: int) -> dict:
                 raw = minmax_ai.get_all_scores(game, depth)
         else:
             raw = minmax_ai.get_all_scores(game, depth)
-        # Normaliser pour l'affichage : convertir en str keys pour JSON
-        return {str(k): v for k, v in raw.items()}
+
+        if not raw:
+            return {}
+
+        # Normaliser 0-100 pour l'affichage (scores minmax bruts = ±10^9)
+        vals = list(raw.values())
+        min_v = min(vals)
+        max_v = max(vals)
+        if max_v - min_v > 0:
+            return {
+                str(k): round((v - min_v) / (max_v - min_v) * 100)
+                for k, v in raw.items()
+            }
+        else:
+            return {str(k): 50 for k in raw}
+
     except Exception as e:
         logger.warning(f"Erreur scores: {e}")
         return {}
 
 
 def _compute_ai_move(game: Connect4, ai_type: str, depth: int) -> int | None:
+    valid = game.get_valid_columns()
+    if not valid:
+        return None
+
+    # ── PRIORITÉ ABSOLUE 1 : coup gagnant immédiat ────────────────
+    # (avant opening book, avant tout)
+    for col in valid:
+        g2 = game.copy()
+        g2.drop_piece(col)
+        if g2.game_over and g2.winner == game.current_player:
+            return col
+
+    # ── PRIORITÉ ABSOLUE 2 : bloquer victoire adverse immédiate ───
+    opp = YELLOW if game.current_player == RED else RED
+    for col in valid:
+        g2 = game.copy()
+        g2.current_player = opp
+        g2.drop_piece(col)
+        if g2.game_over and g2.winner == opp:
+            return col
+
     if ai_type == "random":
         return random_ai.get_best_move(game)
 
