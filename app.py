@@ -160,6 +160,19 @@ def predict():
     return jsonify({"ok": True, **result})
 
 
+def _estimate_moves_to_win(game: Connect4, winner: int, loser: int, max_sim: int = 20) -> int | None:
+    """Simule la partie avec MinMax profondeur 2 et compte les coups jusqu'à la victoire."""
+    g = game.copy()
+    for i in range(max_sim):
+        if g.game_over:
+            return i if g.winner == winner else None
+        col = minmax_ai.get_best_move(g, 2)
+        if col is None:
+            break
+        g.drop_piece(col)
+    return None
+
+
 def _deep_predict(game: Connect4, ai_player: int, depth: int = 8) -> dict:
     """Analyse profonde : prédit gagnant et nombre de coups."""
     import math
@@ -193,20 +206,24 @@ def _deep_predict(game: Connect4, ai_player: int, depth: int = 8) -> dict:
             "confidence": "haute"
         }
     elif score > 50:
+        est = _estimate_moves_to_win(game, ai_player, opp)
+        est_str = f" (~{est} coups)" if est else ""
         return {
-            "prediction": f"📈 {player_name} est en avantage (~{81 - game.ply} coups restants)",
-            "winner": None, "turns": None,
+            "prediction": f"📈 {player_name} est en avantage{est_str}",
+            "winner": None, "turns": est,
             "confidence": "moyenne", "score": score
         }
     elif score < -50:
+        est = _estimate_moves_to_win(game, opp, ai_player)
+        est_str = f" (~{est} coups)" if est else ""
         return {
-            "prediction": f"📉 {opp_name} est en avantage (~{81 - game.ply} coups restants)",
-            "winner": None, "turns": None,
+            "prediction": f"📉 {opp_name} est en avantage{est_str}",
+            "winner": None, "turns": est,
             "confidence": "moyenne", "score": score
         }
     else:
         return {
-            "prediction": f"⚖️ Position équilibrée (~{81 - game.ply} coups restants)",
+            "prediction": "⚖️ Position équilibrée",
             "winner": None, "turns": None,
             "confidence": "basse", "score": score
         }
