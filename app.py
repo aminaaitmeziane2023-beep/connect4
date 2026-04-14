@@ -194,19 +194,19 @@ def _deep_predict(game: Connect4, ai_player: int, depth: int = 8) -> dict:
         }
     elif score > 50:
         return {
-            "prediction": f"📈 {player_name} est en avantage",
+            "prediction": f"📈 {player_name} est en avantage (~{81 - game.ply} coups restants)",
             "winner": None, "turns": None,
             "confidence": "moyenne", "score": score
         }
     elif score < -50:
         return {
-            "prediction": f"📉 {opp_name} est en avantage",
+            "prediction": f"📉 {opp_name} est en avantage (~{81 - game.ply} coups restants)",
             "winner": None, "turns": None,
             "confidence": "moyenne", "score": score
         }
     else:
         return {
-            "prediction": "⚖️ Position équilibrée — tout reste ouvert",
+            "prediction": f"⚖️ Position équilibrée (~{81 - game.ply} coups restants)",
             "winner": None, "turns": None,
             "confidence": "basse", "score": score
         }
