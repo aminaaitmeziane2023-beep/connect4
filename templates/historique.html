@@ -48,6 +48,24 @@
 
     .empty { text-align: center; color: #c47a9a; padding: 60px 0; font-size: 0.85rem; font-weight: 700; }
     .loading { text-align: center; color: #d63384; padding: 40px 0; font-size: 0.8rem; font-weight: 700; }
+
+    /* ── Modal Replay ── */
+    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(255,182,221,0.5); backdrop-filter:blur(4px); z-index:1000; align-items:center; justify-content:center; }
+    .modal-overlay.visible { display:flex; }
+    .modal-box { background:#fff; border:3px solid #ffb3d1; border-radius:24px; padding:24px; width:min(520px,95vw); box-shadow:0 8px 40px rgba(255,68,153,0.2); font-family:'Nunito',sans-serif; }
+    .modal-title { color:#d63384; font-size:1rem; font-weight:900; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; }
+    .modal-close { cursor:pointer; color:#c47a9a; font-size:1.2rem; background:none; border:none; font-weight:900; }
+    .replay-grid { display:grid; grid-template-columns:repeat(9,1fr); gap:4px; background:#ffcce0; border:2px solid #ff80be; border-radius:16px; padding:8px; margin:12px 0; }
+    .replay-cell { aspect-ratio:1; border-radius:50%; background:#fff0f5; border:2px solid #ffb3d1; }
+    .replay-cell.red    { background:#ff4499; border-color:#d63384; }
+    .replay-cell.yellow { background:#ffd700; border-color:#e6c200; }
+    .replay-controls { display:flex; gap:8px; justify-content:center; align-items:center; margin-top:10px; flex-wrap:wrap; }
+    .replay-btn { background:#fff; border:2px solid #ffb3d1; color:#d63384; padding:7px 16px; border-radius:14px; cursor:pointer; font-family:'Nunito',sans-serif; font-size:0.7rem; font-weight:700; }
+    .replay-btn:hover { background:#d63384; color:#fff; border-color:#d63384; }
+    .replay-btn:disabled { opacity:0.3; cursor:not-allowed; }
+    .replay-info { text-align:center; font-size:0.65rem; font-weight:700; color:#c47a9a; margin-top:6px; }
+    .btn-replay { background:rgba(214,51,132,0.1); border:2px solid #ffb3d1; color:#d63384; padding:3px 10px; border-radius:10px; cursor:pointer; font-family:'Nunito',sans-serif; font-size:0.6rem; font-weight:700; }
+    .btn-replay:hover { background:#d63384; color:#fff; }
   </style>
 </head>
 <body>
@@ -109,7 +127,7 @@ async function load() {
 
     let html = `<table>
       <thead><tr>
-        <th>#</th><th>DATE</th><th>MODE</th><th>PREMIER JOUEUR</th><th>IA / J2</th><th>RÉSULTAT</th><th>SOURCE</th>
+        <th>#</th><th>DATE</th><th>MODE</th><th>PREMIER JOUEUR</th><th>IA / J2</th><th>RÉSULTAT</th><th>SOURCE</th><th>REPLAY</th>
       </tr></thead><tbody>`;
 
     for (const p of parties) {
@@ -131,6 +149,7 @@ async function load() {
         <td style="color:#ccc">${p.ai2}</td>
         <td>${badge}</td>
         <td>${srcTag}</td>
+        <td><button class="btn-replay" onclick="openReplay(${p.id})">▶ Revoir</button></td>
       </tr>`;
     }
     html += '</tbody></table>';
@@ -163,6 +182,108 @@ function setFilter(f) {
 }
 
 load();
+</script>
+
+<!-- ===== MODAL REPLAY ===== -->
+<div class="modal-overlay" id="replayModal">
+  <div class="modal-box">
+    <div class="modal-title">
+      <span>▶ Replay de la partie <span id="replayGameId"></span></span>
+      <button class="modal-close" onclick="closeReplay()">✕</button>
+    </div>
+    <div class="replay-grid" id="replayGrid"></div>
+    <div class="replay-info" id="replayInfo">Coup 0</div>
+    <div class="replay-controls">
+      <button class="replay-btn" id="rBtnFirst"  onclick="replayGo(0)">⏮ Début</button>
+      <button class="replay-btn" id="rBtnPrev"   onclick="replayStep(-1)">◀ Préc.</button>
+      <button class="replay-btn" id="rBtnNext"   onclick="replayStep(1)">Suiv. ▶</button>
+      <button class="replay-btn" id="rBtnLast"   onclick="replayGo(replayStates.length-1)">Fin ⏭</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── REPLAY ──────────────────────────────────────────────────
+let replayStates = [];
+let replayCursor = 0;
+
+function openReplay(gameId) {
+  document.getElementById('replayGameId').textContent = '#' + gameId;
+  document.getElementById('replayInfo').textContent = 'Chargement...';
+  document.getElementById('replayModal').classList.add('visible');
+
+  // Construire la grille vide
+  const grid = document.getElementById('replayGrid');
+  grid.innerHTML = '';
+  for (let i = 0; i < 81; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'replay-cell';
+    cell.id = 'rc-' + i;
+    grid.appendChild(cell);
+  }
+
+  fetch('/api/replay/' + gameId)
+    .then(r => r.json())
+    .then(data => {
+      if (!data.ok) {
+        document.getElementById('replayInfo').textContent = '⚠ ' + (data.error || 'Erreur');
+        return;
+      }
+      replayStates = data.states;
+      replayCursor = 0;
+      replayRender();
+    })
+    .catch(() => {
+      document.getElementById('replayInfo').textContent = '⚠ Erreur de connexion';
+    });
+}
+
+function closeReplay() {
+  document.getElementById('replayModal').classList.remove('visible');
+  replayStates = [];
+}
+
+function replayRender() {
+  if (!replayStates.length) return;
+  const s = replayStates[replayCursor];
+  const gs = s.grid_str; // 81 chars, row 0 = bas
+
+  // Afficher de haut (row 8) en bas (row 0)
+  for (let row = 0; row < 9; row++) {
+    for (let col = 0; col < 9; col++) {
+      const displayRow = 8 - row; // row 8 en haut visuellement
+      const idx = displayRow * 9 + col;
+      const cellIdx = row * 9 + col;
+      const cell = document.getElementById('rc-' + cellIdx);
+      const ch = gs[idx];
+      cell.className = 'replay-cell' + (ch === 'R' ? ' red' : ch === 'J' ? ' yellow' : '');
+    }
+  }
+
+  document.getElementById('replayInfo').textContent =
+    'Coup ' + s.ply + ' / ' + (replayStates.length - 1) +
+    (s.ply === 0 ? ' — Début de partie' : '');
+
+  document.getElementById('rBtnFirst').disabled = replayCursor === 0;
+  document.getElementById('rBtnPrev').disabled  = replayCursor === 0;
+  document.getElementById('rBtnNext').disabled  = replayCursor >= replayStates.length - 1;
+  document.getElementById('rBtnLast').disabled  = replayCursor >= replayStates.length - 1;
+}
+
+function replayStep(dir) {
+  replayCursor = Math.max(0, Math.min(replayStates.length - 1, replayCursor + dir));
+  replayRender();
+}
+
+function replayGo(idx) {
+  replayCursor = Math.max(0, Math.min(replayStates.length - 1, idx));
+  replayRender();
+}
+
+// Fermer le modal en cliquant en dehors
+document.getElementById('replayModal').addEventListener('click', function(e) {
+  if (e.target === this) closeReplay();
+});
 </script>
 </body>
 </html>

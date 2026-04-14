@@ -490,6 +490,40 @@ def page_historique():
     return render_template("historique.html")
 
 
+@app.route("/api/replay/<int:game_id>", methods=["GET"])
+def replay(game_id):
+    """Retourne tous les états d'une partie pour le replay."""
+    try:
+        conn = database.get_connection()
+        cur  = conn.cursor()
+
+        # Essayer d'abord dans app_states, sinon dans states
+        cur.execute("""
+            SELECT ply, grid_str FROM app_states
+            WHERE game_id = %s ORDER BY ply
+        """, (game_id,))
+        rows = cur.fetchall()
+
+        if not rows:
+            cur.execute("""
+                SELECT ply, grid_str FROM states
+                WHERE game_id = %s ORDER BY ply
+            """, (game_id,))
+            rows = cur.fetchall()
+
+        cur.close()
+
+        if not rows:
+            return jsonify({"ok": False, "error": "Aucun état trouvé pour cette partie"}), 404
+
+        states = [{"ply": ply, "grid_str": grid_str} for ply, grid_str in rows]
+        return jsonify({"ok": True, "game_id": game_id, "states": states, "total": len(states)})
+
+    except Exception as e:
+        logger.error(f"Erreur replay: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
 @app.route("/api/historique", methods=["GET"])
 def historique():
     """Retourne l'historique de toutes les parties (app_games + games historiques)."""
