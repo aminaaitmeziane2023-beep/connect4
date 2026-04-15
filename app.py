@@ -160,17 +160,21 @@ def predict():
     return jsonify({"ok": True, **result})
 
 
-def _estimate_moves_to_win(game: Connect4, winner: int, loser: int, max_sim: int = 20) -> int | None:
+def _estimate_moves_to_win(game: Connect4, winner: int, loser: int, max_sim: int = 50) -> int:
     """Simule la partie avec MinMax profondeur 2 et compte les coups jusqu'à la victoire."""
     g = game.copy()
-    for i in range(max_sim):
+    for i in range(1, max_sim + 1):
         if g.game_over:
-            return i if g.winner == winner else None
+            if g.winner == winner:
+                return i - 1
+            break
         col = minmax_ai.get_best_move(g, 2)
         if col is None:
             break
         g.drop_piece(col)
-    return None
+    # Estimation grossière si pas de fin trouvée
+    empty = sum(1 for r in range(9) for c in range(9) if game.board[r][c] == 0)
+    return max(2, empty // 5)
 
 
 def _deep_predict(game: Connect4, ai_player: int, depth: int = 8) -> dict:
