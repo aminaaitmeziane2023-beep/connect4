@@ -325,32 +325,22 @@ def hint():
     if game.game_over:
         return jsonify({"error": "Partie terminée"}), 400
 
-    depth = g.get("depth", 4)
+    # Même profondeur que PRÉDIRE pour cohérence
+    depth = max(5, g.get("depth", 4))
     valid = game.get_valid_columns()
 
-    # PRIORITÉ 1 : coup gagnant immédiat
-    best_col = None
-    for col in valid:
-        g2 = game.copy()
-        g2.drop_piece(col)
-        if g2.game_over and g2.winner == game.current_player:
-            best_col = col
-            break
+    # Utiliser le même minimax que PRÉDIRE → cohérence garantie
+    import math
+    best_col, _ = minmax_ai.minimax(game, depth, -math.inf, math.inf, True, game.current_player)
 
-    # PRIORITÉ 2 : bloquer victoire adverse
-    if best_col is None:
-        opp = YELLOW if game.current_player == RED else RED
+    # Sécurité : si minimax retourne None, fallback priorités manuelles
+    if best_col is None or best_col not in valid:
         for col in valid:
             g2 = game.copy()
-            g2.current_player = opp
             g2.drop_piece(col)
-            if g2.game_over and g2.winner == opp:
+            if g2.game_over and g2.winner == game.current_player:
                 best_col = col
                 break
-
-    # PRIORITÉ 3 : MinMax
-    if best_col is None:
-        best_col = minmax_ai.get_best_move(game, depth)
 
     all_scores = minmax_ai.get_all_scores(game, depth)
 
