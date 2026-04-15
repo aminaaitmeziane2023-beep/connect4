@@ -326,7 +326,32 @@ def hint():
         return jsonify({"error": "Partie terminée"}), 400
 
     depth = g.get("depth", 4)
-    best_col   = minmax_ai.get_best_move(game, depth)
+    valid = game.get_valid_columns()
+
+    # PRIORITÉ 1 : coup gagnant immédiat
+    best_col = None
+    for col in valid:
+        g2 = game.copy()
+        g2.drop_piece(col)
+        if g2.game_over and g2.winner == game.current_player:
+            best_col = col
+            break
+
+    # PRIORITÉ 2 : bloquer victoire adverse
+    if best_col is None:
+        opp = YELLOW if game.current_player == RED else RED
+        for col in valid:
+            g2 = game.copy()
+            g2.current_player = opp
+            g2.drop_piece(col)
+            if g2.game_over and g2.winner == opp:
+                best_col = col
+                break
+
+    # PRIORITÉ 3 : MinMax
+    if best_col is None:
+        best_col = minmax_ai.get_best_move(game, depth)
+
     all_scores = minmax_ai.get_all_scores(game, depth)
 
     return jsonify({
